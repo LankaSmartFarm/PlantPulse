@@ -1,5 +1,7 @@
 # 🌿 PlantPulse – Universal IoT Device for Smart Agriculture
 
+<img src="https://raw.githubusercontent.com/LankaSmartFarm/PlantPulse/develop/PlantPulse.png" width="128" height="128" alt="PlantPulse Logo" />
+
 **PlantPulse** is an open-source, rugged, and intelligent IoT hardware platform designed as part of the LankaSmartFarm DPI initiative. It enables precision farming through sensor-driven insights and remote control, built specifically for the tropical agriculture challenges of Sri Lanka and similar regions.
 
 This universal device combines sensing, communication, and control in a modular, scalable way—empowering farmers and AgriTech developers with real-time actionable data and automation.
