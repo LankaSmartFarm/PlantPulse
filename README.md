@@ -117,7 +117,7 @@ This project will be released under an open hardware-compliant license (e.g., CE
 ## 📬 Contact & Updates
 
 - 🌐 [LankaSmartFarm GitHub](https://github.com/LankaSmartFarm)
-- 💬 Discussions: [Coming soon]
+
 
 ---
 
