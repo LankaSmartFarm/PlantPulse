@@ -36,7 +36,7 @@ This Code of Conduct applies within project spaces (GitHub issues, PRs, discussi
 ## 📞 Reporting
 
 If you experience or witness unacceptable behaviour, report it to:  
-**Email:** plantpulse@lankasmartfarm.org  
+**Email:** damith@drklk.org (temporary)
 **GitHub:** Open a private issue (use sensitive tags)
 
 ---
