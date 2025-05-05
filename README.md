@@ -104,7 +104,7 @@ Stay tuned for schematics, BOM, and reference firmware.
 
 We welcome hardware tinkerers, firmware developers, Agri researchers, and field testers.
 
-Check our [CONTRIBUTING.md](../.github/CONTRIBUTING.md) to get started.
+Check our [CONTRIBUTING.md](CONTRIBUTING.md) to get started.
 
 ---
 
