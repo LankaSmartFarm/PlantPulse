@@ -1,3 +1,7 @@
 build/
 sdkconfig
 sdkconfig.old
+
+
+# Ignore personal config header
+projConfig.h
