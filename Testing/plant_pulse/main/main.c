@@ -14,13 +14,9 @@ extern SemaphoreHandle_t uart_mutex;
 void app_main(void) {
 
 
-    // uint8_t mqtt_buf[256];
     sim800l_gpio_init();
-    // // sim800l_hard_reset();
     sim800l_uart_init();
-
     uart_mutex = xSemaphoreCreateMutex();
-
     if (uart_mutex == NULL) {
         ESP_LOGE("MAIN", "Failed to create UART mutex!");
         return;

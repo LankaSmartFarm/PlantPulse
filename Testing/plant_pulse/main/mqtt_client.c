@@ -7,11 +7,10 @@
 #include "sim800l.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "projConfig.h"
 
 
 #define MQTT_APN     "internet"
-#define MQTT_HOST    "mqtt.lankasmart.farm"
-#define MQTT_PORT    1883
 #define RECONNECT_DELAY_MS 5000
 
 static const char *TAG = "MQTT_TASK";
@@ -94,7 +93,7 @@ static void mqtt_sim800l_task(void *pvParameters)
         }
 
         // ---- MQTT CONNECT ----
-        int len = mqtt_connect_packet(connect_buf, "pjj2wavynvq62q9poz87", "a3unrrv00hocglccoxy2", "m6a7got5mywyhony2hmv");
+        int len = mqtt_connect_packet(connect_buf, USER_ID, USER_NAME, PASSWORD);
         if (!sim800l_send_tcp(connect_buf, len)) {
             ESP_LOGE(TAG, "MQTT CONNECT failed");
             sim800l_disconnect_tcp();
@@ -102,7 +101,7 @@ static void mqtt_sim800l_task(void *pvParameters)
         }
 
         uint8_t subscribe_buf[128];
-        int subscribe_len = mqtt_subscribe_packet(subscribe_buf, 1,"v1/devices/me/telemetry");
+        int subscribe_len = mqtt_subscribe_packet(subscribe_buf, 1,TOPIC1);
         if (!sim800l_send_tcp(subscribe_buf, subscribe_len)) {
             ESP_LOGE(TAG, "MQTT SUBSCRIBE failed");
             sim800l_disconnect_tcp();

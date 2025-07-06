@@ -6,7 +6,7 @@
 #include "driver/gpio.h"
 #include "freertos/semphr.h"
 #include "freertos/task.h"
-
+#include "projConfig.h"
 #include <stdint.h>
 
 static uint16_t mqtt_packet_id = 1;  // Global packet ID counter
@@ -291,7 +291,5 @@ bool sim800l_send_tcp(const uint8_t *data, int len) {
         ESP_LOGE(TAG, "Data send failed");
         return false;
     }
-
-    // ESP_LOGI(TAG, "Data sent successfully");
     return true;
 }
