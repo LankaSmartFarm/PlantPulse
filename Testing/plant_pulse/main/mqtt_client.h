@@ -1,9 +1,6 @@
 
-#pragma once
 
 #include <stdint.h>
-
-
 
 void mqtt_sim800l_start(void);
 int mqtt_connect_packet(uint8_t *buf, const char *client_id, const char *username, const char *password);
