@@ -17,20 +17,10 @@ void HALT(){
 
 void app_main(void) {
     
-
-
     // Initialize GPIO for SIM800L
     sim800l_gpio_init();
-
     // Initialize UART for SIM800L communication
     sim800l_uart_init();
-
     // Start the MQTT task
     mqtt_sim800l_start();
-
-
-
-
-    
-
 }
