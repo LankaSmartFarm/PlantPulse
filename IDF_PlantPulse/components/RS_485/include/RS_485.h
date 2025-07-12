@@ -8,10 +8,6 @@
 
 // Modbus Configuration
 #define MB_BUFFER_SIZE     256               // Modbus buffer size
-// #define MB_SLAVE_ADDR      0x03              // Modbus slave address
-// #define MB_FUNC_CODE       0x03              // Modbus function code (read holding registers)
-
-
 
 // Modbus RTU Configuration
 #define MB_UART_PORT UART_NUM_2  // UART port for Modbus RTU
@@ -25,20 +21,6 @@
 #define MB_CTS_PIN UART_PIN_NO_CHANGE
 #define MB_RX_BUFFER_SIZE 256    // RX buffer size
 #define MB_TX_BUFFER_SIZE 256    // TX buffer size
-
-// Modbus RTU Function Codes
-// #define MB_READ_COILS 0x01
-// #define MB_READ_DISCRETE_INPUTS 0x02
-// #define MB_READ_HOLDING_REGISTERS 0x03
-// #define MB_READ_INPUT_REGISTERS 0x04
-// #define MB_WRITE_SINGLE_COIL 0x05
-// #define MB_WRITE_SINGLE_REGISTER 0x06
-// #define MB_WRITE_MULTIPLE_COILS 0x0F
-// #define MB_WRITE_MULTIPLE_REGISTERS 0x10
-// Modbus RTU Exceptions
-// #define MB_EXCEPTION_ILLEGAL_FUNCTION 0x01
-// #define MB_EXCEPTION_ILLEGAL_DATA_ADDRESS 0x02
-// #define MB_EXCEPTION_ILLEGAL_DATA_VALUE 0x03
 
 // Function Prototypes
 void PH_init(void);
