@@ -1,10 +1,11 @@
 
-// #ifndef MQTT_H
-// #define MQTT_H
+#ifndef MQTT_H
+#define MQTT_H
 
-
-#include <stdbool.h>
+#include "string.h"
 #include <stdint.h>
+#include <stdbool.h>
+#include "stdio.h"
 #include "esp_log.h"
 #include "driver/uart.h"
 #include "driver/gpio.h"
@@ -13,6 +14,30 @@
 #define MODEM_UART_TX        (GPIO_NUM_16)
 #define MODEM_UART_RX         (GPIO_NUM_15)
 #define MODEM_RESET_PIN       (GPIO_NUM_3)
+
+
+typedef struct {
+    uint64_t timestamp;             // 8 bytes
+    uint8_t device_id[6];           // 6 bytes (e.g., MAC address)
+    char topic[20];                 // 20 bytes
+    uint16_t battery_mv;            // 2 bytes
+
+    struct {
+        uint16_t ph;                // 2
+        uint16_t moisture;          // 2
+        int16_t temperature;        // 2
+        uint16_t conductivity;      // 2
+        uint16_t nitrogen;          // 2
+        uint16_t phosphorus;        // 2
+        uint16_t potassium;         // 2
+    } sensor_data[20];              // 14 × 20 = 280 bytes
+
+    uint8_t reserved[4];            // 4 bytes (can extend if needed)
+    uint16_t crc;                   // 2 bytes
+} __attribute__((packed)) M_payload_t;
+
+
+extern QueueHandle_t modbus_payload_queue;
 
 void sim800l_gpio_init(void);
 void  sim800l_hard_reset(uint8_t wait_seconds);
@@ -45,4 +70,4 @@ extern bool  sim800l_full_init(const char *apn) ;
 
 
 
-// #endif
+#endif
