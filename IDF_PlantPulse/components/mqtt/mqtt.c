@@ -437,35 +437,30 @@ static void mqtt_sim800l_task(void *pvParameters)
 
         }
         // ---- Main loop: PUBLISH/KEEP-ALIVE ----
+        M_payload_t received_payload;
+        uint8_t mqtt_packet[512];  // Buffer for MQTT publish packet
+
         while (1) {
 
+            if (xQueueReceive(modbus_payload_queue, &received_payload, 0) == pdPASS) {
             
-            // static uint8_t failCounter = 0;
-            //     if(!publish_sensor_data(
-            //         25.5 ,      // Temperature
-            //         40.0 ,      // Moisture
-            //         6.5  * 0.1, // pH
-            //         500  * 10,  // Conductivity
-            //         20 ,        // N
-            //         15 ,        // P
-            //         30 ,        // K
-            //         350  * 5,   // Salinity
-            //         450 * 10   // TDS
-            //     )){
-            //         failCounter++;
-            //         if(failCounter>9){
-            //             break; // Exit the loop to reconnect
-            //         } else {
-            //             ESP_LOGW(TAG, "Failed to publish sensor data, retrying...%d", failCounter);
-            //         }
-                    
-            //     }else failCounter = 0; // Reset fail counter on success
+                int len = mqtt_publish_packet(
+                                mqtt_packet,
+                                (const char *)received_payload.topic,
+                                (const uint8_t *)&received_payload, 
+                                sizeof(received_payload),
+                                0 // QOS = 0
+                            );
 
-            // vTaskDelay(pdMS_TO_TICKS(1000));  // simulate keep-alive
-            // if(failCounter>9){
-            //     ESP_LOGE(TAG, "Failed to publish sensor data after multiple attempts. Disconnecting...");
-            //     break; // Exit the loop to reconnect
-            // }
+                if (!sim800l_send_tcp(mqtt_packet, len)) {
+                    ESP_LOGE("MQTT", "Failed to publish sensor data");
+                } else {
+                    ESP_LOGI("MQTT", "Sensor data published successfully");
+                    // save in NVS or flash if needed
+
+                    break;
+                }
+            }
 
         }
 
