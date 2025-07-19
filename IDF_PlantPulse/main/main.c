@@ -21,7 +21,11 @@ void app_main(void) {
 
     modbus_payload_queue = xQueueCreate(5, sizeof(M_payload_t));
 
-    
+
+    if (modbus_payload_queue == NULL ) {
+        ESP_LOGE(TAG, "Failed to create queues");
+        esp_restart();
+    }
     // Initialize GPIO for SIM800L
     sim800l_gpio_init();
     // Initialize UART for SIM800L communication

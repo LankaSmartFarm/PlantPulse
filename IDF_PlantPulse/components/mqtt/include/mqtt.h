@@ -16,6 +16,22 @@
 #define MODEM_RESET_PIN       (GPIO_NUM_3)
 
 
+typedef enum {
+    // Sim Network States
+    NETWORK_STATE_OFF = 0,           // SIM800L powered off or not initialized
+    NETWORK_STATE_SIM_READY,         // SIM card detected and ready
+    NETWORK_STATE_GPRS_ATTACHED,     // Successfully attached to GPRS
+    NETWORK_STATE_GPRS_ERROR,        // Failed to attach to GPRS
+    // MQTT-Specific States
+    MQTT_STATE_DISCONNECTED,         // TCP/MQTT not connected
+    MQTT_STATE_TCP_CONNECTED,        // TCP connected (but MQTT not yet)
+    MQTT_STATE_MQTT_CONNECTED,       // Fully connected to MQTT broker
+    MQTT_STATE_SUBSCRIBING,          // Subscribing to a topic
+    MQTT_STATE_ERROR,                // General MQTT/Network error
+} networkState;
+
+networkState currentStatus;
+
 typedef struct {
     uint64_t timestamp;             // 8 bytes
     uint8_t device_id[6];           // 6 bytes (e.g., MAC address)
@@ -37,7 +53,11 @@ typedef struct {
 } __attribute__((packed)) M_payload_t;
 
 
+TaskHandle_t mqtt_publish_task_handle =NULL;
+TaskHandle_t mqtt_sim800l_task_handle = NULL;
+
 extern QueueHandle_t modbus_payload_queue;
+
 
 void sim800l_gpio_init(void);
 void  sim800l_hard_reset(uint8_t wait_seconds);
