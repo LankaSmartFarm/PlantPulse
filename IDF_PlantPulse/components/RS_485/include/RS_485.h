@@ -22,8 +22,11 @@
 #define MB_RX_BUFFER_SIZE 256    // RX buffer size
 #define MB_TX_BUFFER_SIZE 256    // TX buffer size
 
+
+
+
 // Function Prototypes
-void PH_init(void);
+void RS_485_Init(void);
 void MB_rtu_send(uint8_t slave_address,
                  uint8_t function_code, 
                  uint16_t start_address, 

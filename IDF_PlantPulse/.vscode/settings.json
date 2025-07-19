@@ -19,6 +19,12 @@
   "idf.flashType": "UART",
   "files.associations": {
     "mqtt.h": "c",
-    "uart.h": "c"
+    "uart.h": "c",
+    "rs_485.h": "c",
+    "string.h": "c",
+    "semphr.h": "c",
+    "datalogging.h": "c",
+    "queue.h": "c",
+    "stdbool.h": "c"
   }
 }
