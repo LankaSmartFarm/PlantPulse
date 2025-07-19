@@ -90,9 +90,37 @@ void modbus_collect_task(void *pvParameters)
         // Wait for notification from RTC or triggering task
         ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
 
-        ESP_LOGI("MODBUS_TASK", "Collecting Modbus data...");
-        payload = build_modbus_payload();
+        // ESP_LOGI("MODBUS_TASK", "Collecting Modbus data...");
+        // payload = build_modbus_payload();
 
+        //-------------------dammy data------------------------------------------------------
+
+        ESP_LOGI("MODBUS_TASK", "Collecting dummy Modbus data...");
+        // --- Fill timestamp ---
+        payload.timestamp = esp_timer_get_time(); // microseconds since boot
+        // --- Dummy device ID (can use MAC in future) ---
+        uint8_t dummy_mac[6] = { 0xAA, 0xBB, 0xCC, 0x11, 0x22, 0x33 };
+        memcpy(payload.device_id, dummy_mac, 6);
+        // --- Topic ---
+        strncpy(payload.topic, "soil/sensor/data", sizeof(payload.topic));
+        // --- Dummy battery voltage ---
+        payload.battery_mv = 3700;
+        // --- Dummy data for 20 sensors ---
+        for (int i = 0; i < 20; i++) {
+            payload.sensor_data[i].ph = 700 + i;             // e.g., pH = 7.00
+            payload.sensor_data[i].moisture = 350 + i;
+            payload.sensor_data[i].temperature = 250 + i;    // e.g., 25.0°C
+            payload.sensor_data[i].conductivity = 500 + i;
+            payload.sensor_data[i].nitrogen = 20 + i;
+            payload.sensor_data[i].phosphorus = 10 + i;
+            payload.sensor_data[i].potassium = 30 + i;
+        }
+        // --- Reserved ---
+        memset(payload.reserved, 0xFF, sizeof(payload.reserved));
+        // --- CRC ---
+        payload.crc = crc16((uint8_t*)&payload, sizeof(M_payload_t) - sizeof(payload.crc));
+        //------------------dummy end--------------------------------------------------------
+        
         if (xQueueSend(modbus_payload_queue, &payload, pdMS_TO_TICKS(100)) != pdPASS) {
             ESP_LOGW("MODBUS_TASK", "Failed to queue Modbus payload");
         } else {

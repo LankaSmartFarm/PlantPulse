@@ -179,9 +179,13 @@ bool  sim800l_full_init(const char *apn) {
         max_try--;
     }
     if (max_try==0) {
+        currentStatus = NETWORK_STATE_GPRS_ERROR;
         sim800l_hard_reset(10);
         return sim800l_init_gprs(apn);
-    }else return true;
+    }else {
+        currentStatus = NETWORK_STATE_GPRS_ATTACHED;
+        return true;
+    }
 }
 
 void sim800l_gpio_init(void)
@@ -203,10 +207,13 @@ void sim800l_hard_reset(uint8_t wait_seconds)
 
     // Perform hard reset sequence
     gpio_set_level(MODEM_RESET_PIN, 0);
+    currentStatus = NETWORK_STATE_OFF;
     vTaskDelay(pdMS_TO_TICKS(500));   // hold LOW for 500ms
     gpio_set_level(MODEM_RESET_PIN, 1);
+    currentStatus = NETWORK_STATE_GPRS_ERROR;
     vTaskDelay(pdMS_TO_TICKS(wait_seconds*1000)); // wait 10 seconds after reset
     // ESP_LOGI(TAG, "SIM800L reset done");
+
 }
 
 
@@ -345,11 +352,13 @@ bool  sim800l_init_gprs(const char *apn) {
         // ESP_LOGE(TAG, "IME command failed");
         return false;
     }
-
+    currentStatus = NETWORK_STATE_SIM_READY;
     if (!send_command("AT+CREG?", "+CREG: 0,1","+CREG: 0,2", 1000)) {
         // ESP_LOGE(TAG, "AT+CREG? command failed");
         return false;
     }
+    currentStatus = NETWORK_STATE_GPRS_ATTACHED;
+
     return true;
 
 }
@@ -358,8 +367,6 @@ bool  sim800l_init_gprs(const char *apn) {
 
 bool sim800l_connect_tcp(const char *host, int port) {
     char cmd[128];
-
-
 
     if (!sim800l_send_command("AT+CIPSSL=0", "OK", 5000) ) return false;// no ssl 
     // close all old connections
@@ -403,86 +410,158 @@ bool sim800l_send_tcp(const uint8_t *data, int len) {
 }
 
 
+// static void mqtt_sim800l_task(void *pvParameters)
+// {
+
+//     uint8_t connect_buf[256];
+
+//     while (1) {
+//         ESP_LOGI(TAG, "Resetting and reinitializing SIM800L...");
+
+//         if(!sim800l_full_init(MQTT_APN))continue;
+
+//         if (!sim800l_connect_tcp(MQTT_HOST, MQTT_PORT)) {
+//             ESP_LOGW(TAG, "TCP connection failed. Will retry...");
+//             continue;
+//         }
+
+//         // ---- MQTT CONNECT ----
+//         int len = mqtt_connect_packet(connect_buf, USER_ID, USER_NAME, USER_PASSWORD);
+//         if (!sim800l_send_tcp(connect_buf, len)) {
+//             ESP_LOGE(TAG, "MQTT CONNECT failed");
+//             sim800l_disconnect_tcp();
+//             continue;
+//         }
+
+//         uint8_t subscribe_buf[128];
+//         int subscribe_len = mqtt_subscribe_packet(subscribe_buf, 1,TOPIC);
+//         if (!sim800l_send_tcp(subscribe_buf, subscribe_len)) {
+//             ESP_LOGE(TAG, "MQTT SUBSCRIBE failed");
+//             sim800l_disconnect_tcp();
+//             continue;
+
+//         }
+//         // ---- Main loop: PUBLISH/KEEP-ALIVE ----
+//         M_payload_t received_payload;
+//         uint8_t mqtt_packet[512];  // Buffer for MQTT publish packet
+
+//         while (1) {
+
+//             if (xQueueReceive(modbus_payload_queue, &received_payload, 0) == pdPASS) {
+            
+//                 int len = mqtt_publish_packet(
+//                                 mqtt_packet,
+//                                 (const char *)received_payload.topic,
+//                                 (const uint8_t *)&received_payload, 
+//                                 sizeof(received_payload),
+//                                 0 // QOS = 0
+//                             );
+
+//                 if (!sim800l_send_tcp(mqtt_packet, len)) {
+//                     ESP_LOGE("MQTT", "Failed to publish sensor data");
+//                 } else {
+//                     ESP_LOGI("MQTT", "Sensor data published successfully");
+//                     // save in NVS or flash if needed
+
+//                     break;
+//                 }
+//             }
+
+//         }
+
+//     }
+// }
 
 
 static void mqtt_sim800l_task(void *pvParameters)
 {
-
     uint8_t connect_buf[256];
 
     while (1) {
         ESP_LOGI(TAG, "Resetting and reinitializing SIM800L...");
 
-        if(!sim800l_full_init(MQTT_APN))continue;
+        if (!sim800l_full_init(MQTT_APN)) continue;
 
         if (!sim800l_connect_tcp(MQTT_HOST, MQTT_PORT)) {
             ESP_LOGW(TAG, "TCP connection failed. Will retry...");
             continue;
         }
+        currentStatus = MQTT_STATE_TCP_CONNECTED;
 
-        // ---- MQTT CONNECT ----
         int len = mqtt_connect_packet(connect_buf, USER_ID, USER_NAME, USER_PASSWORD);
         if (!sim800l_send_tcp(connect_buf, len)) {
             ESP_LOGE(TAG, "MQTT CONNECT failed");
             sim800l_disconnect_tcp();
             continue;
         }
+        currentStatus = MQTT_STATE_MQTT_CONNECTED;
+
 
         uint8_t subscribe_buf[128];
-        int subscribe_len = mqtt_subscribe_packet(subscribe_buf, 1,TOPIC);
+        int subscribe_len = mqtt_subscribe_packet(subscribe_buf, 1, TOPIC);
         if (!sim800l_send_tcp(subscribe_buf, subscribe_len)) {
             ESP_LOGE(TAG, "MQTT SUBSCRIBE failed");
             sim800l_disconnect_tcp();
             continue;
-
         }
-        // ---- Main loop: PUBLISH/KEEP-ALIVE ----
-        M_payload_t received_payload;
-        uint8_t mqtt_packet[512];  // Buffer for MQTT publish packet
-
-        while (1) {
-
-            if (xQueueReceive(modbus_payload_queue, &received_payload, 0) == pdPASS) {
-            
-                int len = mqtt_publish_packet(
-                                mqtt_packet,
-                                (const char *)received_payload.topic,
-                                (const uint8_t *)&received_payload, 
-                                sizeof(received_payload),
-                                0 // QOS = 0
-                            );
-
-                if (!sim800l_send_tcp(mqtt_packet, len)) {
-                    ESP_LOGE("MQTT", "Failed to publish sensor data");
-                } else {
-                    ESP_LOGI("MQTT", "Sensor data published successfully");
-                    // save in NVS or flash if needed
-
-                    break;
-                }
-            }
-
-        }
-
+        currentStatus = MQTT_STATE_SUBSCRIBE;
+        ESP_LOGI(TAG, "MQTT Connected and Subscribed");
+        ulTaskNotifyTake(pdTRUE, portMAX_DELAY);  // Wait for disconnect notice
     }
 }
-void mqtt_receive_task(void *pvParameters)
+
+static void mqtt_publish_task(void *pvParameters)
 {
-    char recv_buf[512];
+    M_payload_t received_payload;
+    uint8_t mqtt_packet[512];
 
     while (1) {
+        
+        if (xQueueReceive(modbus_payload_queue, &received_payload, portMAX_DELAY) == pdPASS) {
+            int len = mqtt_publish_packet(
+                mqtt_packet,
+                (const char *)received_payload.topic,
+                (const uint8_t *)&received_payload,
+                sizeof(received_payload),
+                0
+            );
 
-        int len = uart_read_bytes(MODEM_UART_PORT, (uint8_t *)recv_buf, sizeof(recv_buf), pdMS_TO_TICKS(1000));
-        if (len > 0) {
-            mqtt_handle_incoming((uint8_t *)recv_buf, len);
+            if (!sim800l_send_tcp(mqtt_packet, len)) {
+                ESP_LOGE("MQTT_PUB", "Failed to publish, notifying reconnect");
+                // QUEUE TO THE NVS HERE-----------------------------
+
+
+                //----------------------------------------------------
+                currentStatus = MQTT_STATE_DISCONNECTED;
+                xTaskNotifyGive(mqtt_sim800l_task_handle);  // Trigger reconnect
+            }
+
+            ESP_LOGI("MQTT_PUB", "Published sensor data");
         }
-        vTaskDelay(pdMS_TO_TICKS(1000));  // Adjust as needed
     }
 }
+
+
+
+// void mqtt_receive_task(void *pvParameters)
+// {
+//     char recv_buf[512];
+
+//     while (1) {
+
+//         int len = uart_read_bytes(MODEM_UART_PORT, (uint8_t *)recv_buf, sizeof(recv_buf), pdMS_TO_TICKS(1000));
+//         if (len > 0) {
+//             mqtt_handle_incoming((uint8_t *)recv_buf, len);
+//         }
+//         vTaskDelay(pdMS_TO_TICKS(1000));  // Adjust as needed
+//     }
+// }
 void mqtt_sim800l_start(void)
 {
 
-    xTaskCreatePinnedToCore(mqtt_sim800l_task, "mqtt_sim800l_task", 1024*4, NULL, 5, NULL,0);
+    xTaskCreatePinnedToCore(mqtt_sim800l_task, "mqtt_sim800l_task", 1024*4, NULL, 5, &mqtt_sim800l_task_handle,0);
     // xTaskCreatePinnedToCore(mqtt_receive_task, "mqtt_receive_task", 1024*4, NULL, 5, NULL,1);
+    xTaskCreatePinnedToCore(mqtt_publish_task, "mqtt_publish_task", 1024*4, NULL, 5, &mqtt_publish_task_handle,0);
+
 
 }
