@@ -2,6 +2,7 @@
 #define DATA_LOGGING_H
 #include <stdint.h>
 #include <stdbool.h>
+#include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/queue.h"
 #include "freertos/semphr.h"
@@ -20,7 +21,7 @@
 // extern uint16_t get_battery_mv(void);
 
 
-void modbus_collect_task(void *pvParameters);
+void dataLoggingHandleTask(void *pvParameters);
 
 
 #endif // DATA_LOGGING_H

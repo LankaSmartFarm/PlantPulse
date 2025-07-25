@@ -5,37 +5,32 @@
 #include "dataLogging.h"
 #include "mqtt.h"
 
-extern TaskHandle_t modbusTaskHandle;
 extern QueueHandle_t modbus_payload_queue;
-
-void HALT(){
-
+extern TaskHandle_t dataLoggingTask_Handle;
+void HALT()
+{
     while (1)
     {
     }
-    
 }
 
-
-void app_main(void) {
+void app_main(void)
+{
 
     modbus_payload_queue = xQueueCreate(5, sizeof(M_payload_t));
 
-
-    if (modbus_payload_queue == NULL ) {
-        ESP_LOGE(TAG, "Failed to create queues");
+    if (modbus_payload_queue == NULL)
+    {
+        ESP_LOGE("modbus_payload_queue", "Failed to create");
         esp_restart();
     }
-    // Initialize GPIO for SIM800L
-    sim800l_gpio_init();
-    // Initialize UART for SIM800L communication
-    sim800l_uart_init();
-    // Start the MQTT task
-    mqtt_sim800l_start();
-
-    xTaskCreatePinnedToCore(modbus_collect_task, "data_collect_task", 1024*4, NULL, 5, &modbusTaskHandle,0);
-
-
-
-    
+    initGPIO();
+    initUART();
+    initTask();
+    while (1)
+    {
+        vTaskDelay(pdMS_TO_TICKS(10000));
+        // ESP_LOGI("MAIN", "NOTIFY TO LOGGING DATA");
+        // xTaskNotifyGive(dataLoggingTask_Handle);
+    }
 }
