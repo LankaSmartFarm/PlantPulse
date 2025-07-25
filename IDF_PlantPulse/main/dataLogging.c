@@ -3,7 +3,7 @@
 #include "dataLogging.h"
 
 QueueHandle_t modbus_payload_queue;
-TaskHandle_t modbusTaskHandle= NULL;
+TaskHandle_t dataLoggingTask_Handle= NULL;
 
 M_payload_t build_modbus_payload(void) {
     M_payload_t payload;
@@ -81,7 +81,7 @@ M_payload_t build_modbus_payload(void) {
 
 
 
-void modbus_collect_task(void *pvParameters)
+void dataLoggingHandleTask(void *pvParameters)
 {
     M_payload_t payload;
 
@@ -102,11 +102,11 @@ void modbus_collect_task(void *pvParameters)
         uint8_t dummy_mac[6] = { 0xAA, 0xBB, 0xCC, 0x11, 0x22, 0x33 };
         memcpy(payload.device_id, dummy_mac, 6);
         // --- Topic ---
-        strncpy(payload.topic, "soil/sensor/data", sizeof(payload.topic));
+        strncpy(payload.topic, "soil/sensor", sizeof(payload.topic));
         // --- Dummy battery voltage ---
         payload.battery_mv = 3700;
         // --- Dummy data for 20 sensors ---
-        for (int i = 0; i < 20; i++) {
+        for (int i = 0; i < 1; i++) {
             payload.sensor_data[i].ph = 700 + i;             // e.g., pH = 7.00
             payload.sensor_data[i].moisture = 350 + i;
             payload.sensor_data[i].temperature = 250 + i;    // e.g., 25.0°C

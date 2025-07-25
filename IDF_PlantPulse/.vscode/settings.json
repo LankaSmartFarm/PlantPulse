@@ -25,6 +25,7 @@
     "semphr.h": "c",
     "datalogging.h": "c",
     "queue.h": "c",
-    "stdbool.h": "c"
+    "stdbool.h": "c",
+    "freertos.h": "c"
   }
 }
