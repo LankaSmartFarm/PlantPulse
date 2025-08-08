@@ -73,6 +73,7 @@ void mqtt_callback(char *topic, uint8_t *payload, unsigned int len);
 void mqtt_process_packet(uint8_t *data, int len, void (*mqtt_callback)(char *, uint8_t *, unsigned int));
 bool mqtt_sim800l_loop(void (*mqtt_callback)(char *topic, uint8_t *payload, unsigned int len));
 int readResponse(char *resp_buf, size_t max_len, int timeout_ms);
+esp_err_t savePayload(const M_payload_t *payload);
 
 extern void dataLoggingHandleTask(void *pvParameters);
 
