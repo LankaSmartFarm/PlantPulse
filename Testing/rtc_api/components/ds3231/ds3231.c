@@ -15,7 +15,6 @@ static uint8_t bcd_to_dec(uint8_t bcd) {
     return ((bcd >> 4) * 10) + (bcd & 0x0F);
 }
 
-
 // Initialize I2C and DS3231
 esp_err_t ds3231_init(ds3231_dev_t *dev, i2c_port_t port, gpio_num_t sda_pin, gpio_num_t scl_pin) {
     ESP_LOGI(TAG, "Initializing DS3231 on I2C port %d", port);
@@ -27,24 +26,22 @@ esp_err_t ds3231_init(ds3231_dev_t *dev, i2c_port_t port, gpio_num_t sda_pin, gp
     dev->cfg.sda_pullup_en = GPIO_PULLUP_ENABLE;
     dev->cfg.scl_pullup_en = GPIO_PULLUP_ENABLE;
     dev->cfg.master.clk_speed = 100000; // 100 kHz
-i2c_config_t cfg;
-i2c_master_bus_config_t i2c_mst_config = {
-    .clk_source = I2C_CLK_SRC_DEFAULT,
-    .i2c_port = I2C_PORT_NUM_0,
-    .scl_io_num = I2C_MASTER_SCL_IO,
-    .sda_io_num = I2C_MASTER_SDA_IO,
-    .glitch_ignore_cnt = 7,
-};
-i2c_master_bus_handle_t bus_handle;
+    dev->cfg.clk_flags = 0; // Use default APB clock
 
     esp_err_t ret = i2c_param_config(port, &dev->cfg);
-    if (ret != ESP_OK) return ret;
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "I2C param config failed: %s", esp_err_to_name(ret));
+        return ret;
+    }
 
     ret = i2c_driver_install(port, I2C_MODE_MASTER, 0, 0, 0);
-    if (ret != ESP_OK) return ret;
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "I2C driver install failed: %s", esp_err_to_name(ret));
+        return ret;
+    }
 
     // Disable 32kHz output and set SQW for alarms
-    uint8_t control = 0x00; // INTCN = 1, alarms enabled
+    uint8_t control = 0x04; // INTCN = 1
     return i2c_master_write_to_device(port, DS3231_ADDRESS, (uint8_t[]){DS3231_REG_CONTROL, control}, 2, 1000 / portTICK_PERIOD_MS);
 }
 

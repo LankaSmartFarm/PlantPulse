@@ -37,7 +37,7 @@ void app_main(void) {
         .tm_mon = 7,    // August (0-based)
         .tm_mday = 8,
         .tm_hour = 1,
-        .tm_min = 1,
+        .tm_min = 19,
         .tm_sec = 0,
         .tm_wday = 5    // Friday (0-based, set for reference)
     };
@@ -50,11 +50,18 @@ void app_main(void) {
             .tm_hour = 1,   // 01:20 AM
             .tm_min = 20,
             .tm_sec = 0,
-            .tm_wday = 5    // Friday (0-based in struct tm, converted to 1-7 in library)
+              // Friday (0-based in struct tm, converted to 1-7 in library)
         },
-        .rate1 = DS3231_ALARM1_DAY, // Trigger on specific day of week
+        .rate1 = DS3231_ALARM1_MINUTES, // Trigger on specific day of week
         .enabled = true
     };
+    // ds3231_alarm_t alarm1 = {
+    // .time = {0}, // Time fields ignored for EVERY_MINUTE
+    // .rate1 = DS3231_ALARM1_MINUTES,
+    // .enabled = true
+    // };
+
+
     //ESP_ERROR_CHECK(ds3231_set_alarm(&dev, &alarm1, NULL));
     ds3231_set_alarm(&dev, &alarm1, NULL);
     // Initialize wake-up on SQW pin (GPIO 33)
