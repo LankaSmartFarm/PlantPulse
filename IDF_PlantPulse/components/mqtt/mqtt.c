@@ -25,6 +25,7 @@ static uint16_t mqtt_packet_id = 1;
 TaskHandle_t publishHandleTask_handle = NULL;
 TaskHandle_t connectionHandleTask_handle = NULL;
 TaskFunction_t receiveHandleTask_handle = NULL;
+QueueHandle_t mqttAckQueue;
 extern TaskHandle_t dataLoggingTask_Handle;
 
 void disconnectTCP(void)
@@ -446,7 +447,7 @@ bool mqttConnect(const char *client_id, const char *username, const char *passwo
     // --- Send MQTT CONNECT packet over TCP ---
     if (!sendTCP(packet, total_len))
     {
-        // ESP_LOGE("MQTT", "Failed to send CONNECT packet");
+        ESP_LOGE("MQTT", "Failed to send CONNECT packet");
         return false;
     }
 
@@ -710,8 +711,6 @@ bool mqttCheckSubscription(void (*mqtt_callback)(char *topic, uint8_t *payload, 
 
 static void connectionHandleTask(void *pvParameters)
 {
-    uint8_t connect_buf[256];
-
     while (1)
     {
         ESP_LOGI(TAG, "Resetting and reinitializing SIM800L...");
@@ -782,20 +781,33 @@ static void publishHandleTask(void *pvParameters)
 
                 if (!sendTCP(mqtt_packet, len))
                 {
+
+                    char empty_ack[1] = {0};
+                    xQueueSend(mqttAckQueue, empty_ack, pdMS_TO_TICKS(100));
                     ESP_LOGE("MQTT_PUB", "Failed to publish, notifying reconnect");
                     // QUEUE TO THE NVS HERE-----------------------------
                     ESP_LOGE("MQTT_PUB", "Failed to publish, queue to nvs");
-
+                    savePayload(&received_payload);
                     //----------------------------------------------------
                     currentStatus = MQTT_STATE_DISCONNECTED;
                     xTaskNotifyGive(connectionHandleTask_handle); // Trigger reconnect
                 }
                 else
+                {
                     ESP_LOGW("MQTT_PUB", "Published sensor data");
+                    char file_path[128];
+                    // Build file path using timestamp
+                    snprintf(file_path, sizeof(file_path), "/fatfs/log/%llu.bin", received_payload.timestamp);
+                    xQueueSend(mqttAckQueue, &file_path, 0);
+                }
             }
             else
             {
+
+                char empty_ack[1] = {0};
+                xQueueSend(mqttAckQueue, empty_ack,pdMS_TO_TICKS(100));
                 // QUEUE TO THE NVS HERE-----------------------------
+                savePayload(&received_payload);
                 ESP_LOGE("MQTT_PUB", "Failed to publish, queue to nvs");
                 //----------------------------------------------------
             }
