@@ -26,6 +26,8 @@
     "datalogging.h": "c",
     "queue.h": "c",
     "stdbool.h": "c",
-    "freertos.h": "c"
+    "freertos.h": "c",
+    "cerrno": "c",
+    "esp_vfs_fat.h": "c"
   }
 }
