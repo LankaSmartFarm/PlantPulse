@@ -15,7 +15,7 @@
     "--query-driver=C:\\Espressif\\tools\\xtensa-esp-elf\\esp-13.2.0_20240530\\xtensa-esp-elf\\bin\\xtensa-esp32s3-elf-gcc.exe",
     "--compile-commands-dir=${workspaceFolder}\\build"
   ],
-  "idf.portWin": "COM3",
+  "idf.portWin": "COM8",
   "idf.flashType": "UART",
   "files.associations": {
     "mqtt.h": "c",
@@ -28,6 +28,8 @@
     "stdbool.h": "c",
     "freertos.h": "c",
     "cerrno": "c",
-    "esp_vfs_fat.h": "c"
+    "esp_vfs_fat.h": "c",
+    "i2c.h": "c",
+    "rtc.h": "c"
   }
 }
