@@ -22,12 +22,12 @@ typedef enum
     NETWORK_STATE_SIM_READY,     // SIM card detected and ready
     NETWORK_STATE_GPRS_ATTACHED, // Successfully attached to GPRS
     NETWORK_STATE_GPRS_ERROR,    // Failed to attach to GPRS
-                              // MQTT-Specific States
-    MQTT_STATE_DISCONNECTED,   // TCP/MQTT not connected
-    MQTT_STATE_TCP_CONNECTED,  // TCP connected (but MQTT not yet)
-    MQTT_STATE_MQTT_CONNECTED, // Fully connected to MQTT broker
-    MQTT_STATE_SUBSCRIBE,      // Subscribing to a topic
-    MQTT_STATE_ERROR,          // General MQTT/Network error
+                                 // MQTT-Specific States
+    MQTT_STATE_DISCONNECTED,     // TCP/MQTT not connected
+    MQTT_STATE_TCP_CONNECTED,    // TCP connected (but MQTT not yet)
+    MQTT_STATE_MQTT_CONNECTED,   // Fully connected to MQTT broker
+    MQTT_STATE_SUBSCRIBE,        // Subscribing to a topic
+    MQTT_STATE_ERROR,            // General MQTT/Network error
 } networkState;
 
 typedef struct
@@ -54,7 +54,6 @@ typedef struct
 
 extern QueueHandle_t modbus_payload_queue;
 
-
 void initTask(void);
 void initGPIO(void);
 void simHardHeset(uint8_t wait_seconds);
@@ -74,6 +73,10 @@ void mqtt_process_packet(uint8_t *data, int len, void (*mqtt_callback)(char *, u
 bool mqtt_sim800l_loop(void (*mqtt_callback)(char *topic, uint8_t *payload, unsigned int len));
 int readResponse(char *resp_buf, size_t max_len, int timeout_ms);
 esp_err_t savePayload(const M_payload_t *payload);
+
+void connectionHandleTask(void *pvParameters);
+void receiveHandleTask(void *pvParameters);
+void publishHandleTask(void *pvParameters);
 
 extern void dataLoggingHandleTask(void *pvParameters);
 
