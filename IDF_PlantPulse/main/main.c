@@ -14,6 +14,7 @@ extern TaskHandle_t rtcTask_Handle;
 extern TaskHandle_t publishHandleTask_handle;
 extern TaskHandle_t connectionHandleTask_handle;
 extern TaskFunction_t receiveHandleTask_handle;
+extern networkState currentStatus;
 // void HALT()
 // {
 //     while (1)
@@ -48,15 +49,12 @@ void app_main(void)
     initUART();
     initTask();
     struct tm now;
-
     // Set time once, then comment this line
     while (1)
     {
-        vTaskDelay(pdMS_TO_TICKS(500));
-        // checkPendingLogs();
-        // ESP_LOGI("MAIN", "NOTIFY TO LOGGING DATA");
-        // xTaskNotifyGive(dataLoggingTask_Handle);
-
+        vTaskDelay(pdMS_TO_TICKS(1000));
+        if (currentStatus >= MQTT_STATE_MQTT_CONNECTED)
+            checkPendingLogs();
         getTime(&now);
         printf("Time: %02d:%02d:%02d Date: %02d-%02d-%04d\n",
                now.tm_hour, now.tm_min, now.tm_sec,
