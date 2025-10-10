@@ -53,7 +53,11 @@ It is designed to monitor and analyze plant health and environmental conditions 
 ---
 
 ## 🖼️ Preview
-*(Add PCB images or schematics here)*  
+![Plant Pulse PCB Top View](Board_3D_Render/Plant_pulse_hardware_V1.0_1.png)
+![Plant Pulse PCB Bottom View](Board_3D_Render/Plant_pulse_hardware_V1.0_2.png)
+![Plant Pulse PCB Side View](Board_3D_Render/Plant_pulse_hardware_V1.0_3.png)
+![Plant Pulse PCB Side2 View](Board_3D_Render/Plant_pulse_hardware_V1.0_4.png)
+
 
 ```bash
 📁 /PlantPulse_Hardware_V1.0
