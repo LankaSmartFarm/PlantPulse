@@ -7,6 +7,8 @@ TaskHandle_t dataLoggingTask_Handle = NULL;
 TaskHandle_t soilBleTaskHandle = NULL;
 TaskHandle_t pingBleTaskHandle = NULL;
 
+
+
 M_payload_t build_modbus_payload(void)
 {
     M_payload_t payload;
@@ -233,29 +235,70 @@ ping_packet_t build_ping_packet(void)
     ping_packet_t pkt;
     memset(&pkt, 0xFF, sizeof(pkt)); // Fill all with 0xFF initially
 
-  //  pkt.packet_type = PING_PACKET_TYPE;
+    //pkt.packet_type = PING_PACKET_TYPE;
 
     // 1️⃣ Device ID (replace with your own MAC getter)
-  // get_device_id(pkt.device_id);   // Example: esp_read_mac()
+    // get_device_id(pkt.device_id);   // Example: esp_read_mac()
 
     // 2️⃣ BLE RSSI (you can track last RSSI)
-  // pkt.ble_rssi = get_ble_rssi();  // Or use a stored variable
+    // pkt.ble_rssi = get_ble_rssi();  // Or use a stored variable
 
     // 3️⃣ Battery level
- //  pkt.battery_level = get_battery_mv();  // e.g., 3850 mV
+    // pkt.battery_level = get_battery_mv();  // e.g., 3850 mV
 
     // 4️⃣ Charge indicator
- //  pkt.charge_status = is_device_charging() ? 1 : 0;
+    //pkt.charge_status = is_device_charging() ? 1 : 0;
 
     // 5️⃣ Modbus slave ID
- //  pkt.modbus_slave_id = get_modbus_slave_id();
+    // pkt.modbus_slave_id = get_modbus_slave_id();
 
     // 6️⃣ Compute CRC
    // pkt.crc = crc16((uint8_t *)&pkt, sizeof(pkt) - 2);
     return pkt;
 }
 
+void get_device_id(uint8_t *id) 
+{
+    esp_read_mac(id, ESP_MAC_BLE);
+}
 
+int8_t get_ble_rssi(void)
+{
+    return -55;
+}
+
+uint16_t get_battery_mv(void)
+{
+       static esp_adc_cal_characteristics_t adc_chars;
+       static bool initialized = false;
+
+       if (!initialized) {
+        adc1_config_width(ADC_WIDTH_BIT_12);
+        adc1_config_channel_atten(ADC_BAT_CHANNEL, ADC_ATTEN);
+         esp_adc_cal_characterize(ADC_UNIT_1, ADC_ATTEN, ADC_WIDTH_BIT_12, 1100, &adc_chars);
+        initialized = true;
+       }
+
+       uint32_t adc_reading = 0;
+       for (int i = 0; i < 10; i++) adc_reading += adc1_get_raw(ADC_BAT_CHANNEL);
+        adc_reading /= 10;
+        uint32_t voltage_mv = esp_adc_cal_raw_to_voltage(adc_reading, &adc_chars);
+        voltage_mv *= 11;  
+        return (uint16_t)voltage_mv;
+}
+
+bool is_device_charging(void)
+{
+    static bool gpio_init = false;
+
+    if (!gpio_init) {
+     gpio_set_direction(CHARGING_GPIO, GPIO_MODE_INPUT);
+     gpio_set_pull_mode(CHARGING_GPIO, GPIO_PULLDOWN_ONLY);
+     gpio_init = true;
+    }
+    
+    return (gpio_get_level(CHARGING_GPIO) == 1);
+}
 
 
 void soil_ble_task(void *pv)

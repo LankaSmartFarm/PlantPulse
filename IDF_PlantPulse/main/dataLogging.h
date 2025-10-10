@@ -27,6 +27,11 @@
 #define ACK_PACKET_TYPE    0x03D7E9FA   // Acknowledgment / response (App → ESP32)
 #define CMD_PACKET_TYPE    0x04EAFB1C   // Command / control (App → ESP32)
 
+// Device Configuration
+#define PIN_PACKET_TYPE 0x01 // Packet type for ping packet
+#define ADC_BAT_CHANNEL ADC1_CHANNEL_3 // ADC chabbel for measuring batter vol
+#define ADC_ATTEN ADC_ATTEN_DB_0 // ADC attenuation setting
+#define CHARGING_GPIO GPIO_NUM_38 // GPIO pin to detect chargin status
 
 
 typedef struct __attribute__((packed)) {
@@ -71,7 +76,10 @@ void soil_ble_task(void *pv);
 void ping_ble_task(void *pv);
 extern void sendOverBLE_soil_packet(soil_packet_t soil_packet,uint16_t total_len);
 extern void sendOverBLE_ping_packet(ping_packet_t ping_packet, uint16_t total_len);
-
+void get_device_id(uint8_t *id)
+int8_t get_ble_rssi(void)
+uint16_t get_battery_mv(void)
+bool is_device_charging(void)
 
 
 #endif // DATA_LOGGING_H
