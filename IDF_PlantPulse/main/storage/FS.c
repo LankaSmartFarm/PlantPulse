@@ -195,3 +195,8 @@ void checkPendingLogs(void)
         ESP_LOGI("FAT", "No pending log files to process.");
     }
 }
+
+
+
+
+

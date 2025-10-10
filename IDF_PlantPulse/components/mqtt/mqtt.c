@@ -52,6 +52,9 @@ bool setupGPRS(const char *apn)
     }
 }
 
+
+
+
 void initGPIO(void)
 {
     gpio_config_t io_conf = {
@@ -80,6 +83,9 @@ void simHardHeset(uint8_t wait_seconds)
 
 void initUART(void)
 {
+
+    initGPIO();
+    
     uart_config_t config = {
         .baud_rate = 115200,
         .data_bits = UART_DATA_8_BITS,

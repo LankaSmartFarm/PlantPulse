@@ -52,6 +52,11 @@ typedef struct
     uint16_t crc;        // 2 bytes
 } __attribute__((packed)) M_payload_t;
 
+
+
+
+
+
 extern QueueHandle_t modbus_payload_queue;
 
 void initTask(void);
