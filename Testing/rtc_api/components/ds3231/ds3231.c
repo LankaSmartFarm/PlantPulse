@@ -1,194 +1,174 @@
 #include "ds3231.h"
-#include <string.h>
-#include <esp_log.h>
-#include <esp_sleep.h>
+#include "driver/i2c.h"
+#include "esp_err.h"
+#include "esp_log.h"
 
-static const char *TAG = "DS3231";
+#define START_REG 0x00
 
-// Helper function to convert decimal to BCD
-static uint8_t dec_to_bcd(uint8_t dec) {
-    return ((dec / 10) << 4) | (dec % 10);
+static uint8_t bcd_to_dec(uint8_t val)
+{
+    return ((val >> 4) * 10) + (val & 0x0F);   
 }
 
-// Helper function to convert BCD to decimal
-static uint8_t bcd_to_dec(uint8_t bcd) {
-    return ((bcd >> 4) * 10) + (bcd & 0x0F);
+static uint8_t dec_to_bcd(uint8_t val) 
+{
+    return ((val / 10) << 4) | (val % 10);   
 }
 
-// Initialize I2C and DS3231
-esp_err_t ds3231_init(ds3231_dev_t *dev, i2c_port_t port, gpio_num_t sda_pin, gpio_num_t scl_pin) {
-    ESP_LOGI(TAG, "Initializing DS3231 on I2C port %d", port);
-    dev->port = port;
-    dev->addr = DS3231_ADDRESS;
-    dev->cfg.mode = I2C_MODE_MASTER;
-    dev->cfg.sda_io_num = sda_pin;
-    dev->cfg.scl_io_num = scl_pin;
-    dev->cfg.sda_pullup_en = GPIO_PULLUP_ENABLE;
-    dev->cfg.scl_pullup_en = GPIO_PULLUP_ENABLE;
-    dev->cfg.master.clk_speed = 100000; // 100 kHz
-    dev->cfg.clk_flags = 0; // Use default APB clock
+// I2C write helper
+static esp_err_t i2c_write(uint8_t start_reg, uint8_t *data, uint8_t len)
+{
+    i2c_cmd_handle_t cmd = i2c_cmd_link_create();
+    i2c_master_start(cmd);
+    i2c_master_write_byte(cmd, (DS3231_ADDR << 1) | I2C_MASTER_WRITE, true);
+    i2c_master_write_byte(cmd, start_reg, true);
+    i2c_master_write(cmd, data, len, true);
+    i2c_master_stop(cmd);
+    esp_err_t ret = i2c_master_cmd_begin(I2C_MASTER_NUM, cmd, pdMS_TO_TICKS(1000));
+    i2c_cmd_link_delete(cmd);
+    return ret;  
+}
 
-    esp_err_t ret = i2c_param_config(port, &dev->cfg);
-    if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "I2C param config failed: %s", esp_err_to_name(ret));
-        return ret;
+static esp_err_t i2c_read(uint8_t start_reg, uint8_t *data, uint8_t len)
+{
+    i2c_cmd_handle_t cmd;  
+
+    cmd = i2c_cmd_link_create();
+    i2c_master_start(cmd);
+    i2c_master_write_byte(cmd, (DS3231_ADDR << 1) | I2C_MASTER_WRITE, true); 
+    i2c_master_write_byte(cmd, start_reg, true);
+    i2c_master_stop(cmd);
+    ESP_ERROR_CHECK(i2c_master_cmd_begin(I2C_MASTER_NUM, cmd, pdMS_TO_TICKS(1000)));
+    i2c_cmd_link_delete(cmd);
+
+    cmd = i2c_cmd_link_create();
+    i2c_master_start(cmd);
+    i2c_master_write_byte(cmd, (DS3231_ADDR << 1) | I2C_MASTER_READ, true);
+    if (len > 1) {
+        i2c_master_read(cmd, data, len - 1, I2C_MASTER_ACK);
     }
+    i2c_master_read_byte(cmd, &data[len - 1], I2C_MASTER_NACK);
+    i2c_master_stop(cmd);
+    esp_err_t ret = i2c_master_cmd_begin(I2C_MASTER_NUM, cmd, pdMS_TO_TICKS(1000));
+    i2c_cmd_link_delete(cmd);
 
-    ret = i2c_driver_install(port, I2C_MODE_MASTER, 0, 0, 0);
-    if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "I2C driver install failed: %s", esp_err_to_name(ret));
-        return ret;
-    }
-
-    // Disable 32kHz output and set SQW for alarms
-    uint8_t control = 0x04; // INTCN = 1
-    return i2c_master_write_to_device(port, DS3231_ADDRESS, (uint8_t[]){DS3231_REG_CONTROL, control}, 2, 1000 / portTICK_PERIOD_MS);
+    return ret;   
 }
 
-// Set time on DS3231
-esp_err_t ds3231_set_time(ds3231_dev_t *dev, struct tm *time) {
-    uint8_t data[7] = {
-        dec_to_bcd(time->tm_sec),
-        dec_to_bcd(time->tm_min),
-        dec_to_bcd(time->tm_hour),
-        dec_to_bcd(time->tm_wday + 1), // 1-7 (Sunday-Saturday)
-        dec_to_bcd(time->tm_mday),
-        dec_to_bcd(time->tm_mon + 1),  // 1-12
-        dec_to_bcd(time->tm_year - 100) // Year since 1900
+// RTC Init
+void ds3231_init(void)
+{
+    i2c_config_t conf = {
+        .mode = I2C_MODE_MASTER,
+        .sda_io_num = I2C_MASTER_SDA,
+        .scl_io_num = I2C_MASTER_SCL,
+        .sda_pullup_en = GPIO_PULLUP_ENABLE,
+        .scl_pullup_en = GPIO_PULLUP_ENABLE,
+        .master.clk_speed = I2C_MASTER_FREQ_HZ,
     };
-    return i2c_master_write_to_device(dev->port, dev->addr, (uint8_t[]){DS3231_REG_SECONDS, data[0], data[1], data[2], data[3], data[4], data[5], data[6]}, 8, 1000 / portTICK_PERIOD_MS);
+
+    i2c_param_config(I2C_MASTER_NUM, &conf);
+    esp_err_t ret = i2c_driver_install(I2C_MASTER_NUM, conf.mode, I2C_MASTER_TX_BUF_DISABLE, I2C_MASTER_RX_BUF_DISABLE, 0);
+
+    if (ret != ESP_OK) {
+        printf("[-] Error: installing I2C driver: %s\n", esp_err_to_name(ret)); 
+    } else {
+        printf("[-] I2C driver installed successfully!\n");
+    }
 }
 
-// Get time from DS3231
-esp_err_t ds3231_get_time(ds3231_dev_t *dev, struct tm *time) {
+// Set time
+esp_err_t set_time(Time *time)
+{
     uint8_t data[7];
-    esp_err_t ret = i2c_master_write_read_device(dev->port, dev->addr, (uint8_t[]){DS3231_REG_SECONDS}, 1, data, 7, 1000 / portTICK_PERIOD_MS);
-    if (ret != ESP_OK) return ret;
 
-    time->tm_sec = bcd_to_dec(data[0]);
-    time->tm_min = bcd_to_dec(data[1]);
-    time->tm_hour = bcd_to_dec(data[2]);
-    time->tm_wday = bcd_to_dec(data[3]) - 1;
-    time->tm_mday = bcd_to_dec(data[4]);
-    time->tm_mon = bcd_to_dec(data[5]) - 1;
-    time->tm_year = bcd_to_dec(data[6]) + 100;
-    return ESP_OK;
+    data[0] = dec_to_bcd(time->seconds);       
+    data[1] = dec_to_bcd(time->minutes);
+    data[2] = dec_to_bcd(time->hours);
+    data[3] = dec_to_bcd(time->day);
+    data[4] = dec_to_bcd(time->wday + 1);
+    data[5] = dec_to_bcd(time->month + 1); 
+    data[6] = dec_to_bcd(time->year - 2000);
+
+    return i2c_write(START_REG, data, sizeof(data));  
 }
 
-// Set alarms (Alarm 1 and Alarm 2)
-esp_err_t ds3231_set_alarm(ds3231_dev_t *dev, ds3231_alarm_t *alarm1, ds3231_alarm_t *alarm2) {
-    esp_err_t ret;
-    uint8_t data[4];
+esp_err_t get_time(Time *current_time)
+{
+    uint8_t data[7];
 
-    // Alarm 1
-    if (alarm1 && alarm1->enabled) {
-        data[0] = dec_to_bcd(alarm1->time.tm_sec);
-        data[1] = dec_to_bcd(alarm1->time.tm_min);
-        data[2] = dec_to_bcd(alarm1->time.tm_hour);
-        data[3] = dec_to_bcd(alarm1->time.tm_mday);
-        if (alarm1->rate1 == DS3231_ALARM1_DAY) data[3] |= 0x40; // Set A1M4 for day of week
-        switch (alarm1->rate1) {
-            case DS3231_ALARM1_EVERY_SECOND: data[0] |= 0x80; data[1] |= 0x80; data[2] |= 0x80; data[3] |= 0x80; break;
-            case DS3231_ALARM1_SECONDS: data[1] |= 0x80; data[2] |= 0x80; data[3] |= 0x80; break;
-            case DS3231_ALARM1_MINUTES: data[2] |= 0x80; data[3] |= 0x80; break;
-            case DS3231_ALARM1_HOURS: data[3] |= 0x80; break;
-            default: break;
-        }
-        ret = i2c_master_write_to_device(dev->port, dev->addr, (uint8_t[]){DS3231_REG_ALARM1_SECONDS, data[0], data[1], data[2], data[3]}, 5, 1000 / portTICK_PERIOD_MS);
-        if (ret != ESP_OK) return ret;
+    i2c_read(START_REG, data, sizeof(data)); 
+
+    current_time->seconds = bcd_to_dec(data[0]);
+    current_time->minutes = bcd_to_dec(data[1]);
+    current_time->hours   = bcd_to_dec(data[2]);
+    current_time->day     = bcd_to_dec(data[3]);
+    current_time->wday    = bcd_to_dec(data[4]);
+    current_time->month   = bcd_to_dec(data[5]);
+    current_time->year    = bcd_to_dec(data[6]) + 2000;
+
+    // ESP_LOGI(TAG, "Time: %02d-%02d-%04d %02d:%02d:%02d",
+    //          current_time->day,
+    //          current_time->month,
+    //          current_time->year,
+    //          current_time->hours,
+    //          current_time->minutes,
+    //          current_time->seconds);
+
+    return ESP_OK; 
+}
+
+
+void rtc_set_alarm(period_t period, alarm_config_t *config) {
+    uint8_t a1m1 = 0, a1m2 = 0, a1m3 = 0, a1m4 = 0;
+    uint8_t dy_dt = 0;
+    uint8_t day_val = 0;
+
+    switch (period) {
+        case HOURLY:
+            a1m1 = 0; a1m2 = 0; a1m3 = 1; a1m4 = 1;
+            break;
+        case DAILY:
+            a1m1 = 0; a1m2 = 0; a1m3 = 0; a1m4 = 1;
+            break;
+        case WEEKLY:
+            a1m1 = 0; a1m2 = 0; a1m3 = 0; a1m4 = 0;
+            dy_dt = 1;
+
+            day_val = dec_to_bcd(config->dow);
+            break;
+        case MONTHLY:
+        case YEARLY:  // Hardware same as monthly; software check for year
+            a1m1 = 0; a1m2 = 0; a1m3 = 0; a1m4 = 0;
+            dy_dt = 0;
+            day_val = dec_to_bcd(config->date);
+            break;
     }
 
-    // Alarm 2
-    if (alarm2 && alarm2->enabled) {
-        data[0] = dec_to_bcd(alarm2->time.tm_min);
-        data[1] = dec_to_bcd(alarm2->time.tm_hour);
-        data[2] = dec_to_bcd(alarm2->time.tm_mday);
-        if (alarm2->rate2 == DS3231_ALARM2_DAY) data[2] |= 0x40; // Set A2M4 for day of week
-        switch (alarm2->rate2) {
-            case DS3231_ALARM2_EVERY_MINUTE: data[0] |= 0x80; data[1] |= 0x80; data[2] |= 0x80; break;
-            case DS3231_ALARM2_MINUTES: data[1] |= 0x80; data[2] |= 0x80; break;
-            case DS3231_ALARM2_HOURS: data[2] |= 0x80; break;
-            default: break;
-        }
-        ret = i2c_master_write_to_device(dev->port, dev->addr, (uint8_t[]){DS3231_REG_ALARM2_MINUTES, data[0], data[1], data[2]}, 4, 1000 / portTICK_PERIOD_MS);
-        if (ret != ESP_OK) return ret;
-    }
-
-    // Enable alarms in control register
-    uint8_t control;
-    ret = i2c_master_write_read_device(dev->port, dev->addr, (uint8_t[]){DS3231_REG_CONTROL}, 1, &control, 1, 1000 / portTICK_PERIOD_MS);
-    if (ret != ESP_OK) return ret;
-    control |= (alarm1 && alarm1->enabled) ? 0x01 : 0; // A1IE
-    control |= (alarm2 && alarm2->enabled) ? 0x02 : 0; // A2IE
-    control |= 0x04; // INTCN = 1 for interrupt output
-    return i2c_master_write_to_device(dev->port, dev->addr, (uint8_t[]){DS3231_REG_CONTROL, control}, 2, 1000 / portTICK_PERIOD_MS);
-}
-
-// Enable or disable alarm
-esp_err_t ds3231_enable_alarm(ds3231_dev_t *dev, uint8_t alarm_num, bool enable) {
-    uint8_t control;
-    esp_err_t ret = i2c_master_write_read_device(dev->port, dev->addr, (uint8_t[]){DS3231_REG_CONTROL}, 1, &control, 1, 1000 / portTICK_PERIOD_MS);
-    if (ret != ESP_OK) return ret;
-
-    if (alarm_num == 1) {
-        control = enable ? (control | 0x01) : (control & ~0x01);
-    } else if (alarm_num == 2) {
-        control = enable ? (control | 0x02) : (control & ~0x02);
-    }
-    return i2c_master_write_to_device(dev->port, dev->addr, (uint8_t[]){DS3231_REG_CONTROL, control}, 2, 1000 / portTICK_PERIOD_MS);
-}
-
-// Clear alarm flag
-esp_err_t ds3231_clear_alarm(ds3231_dev_t *dev, uint8_t alarm_num) {
-    uint8_t status;
-    esp_err_t ret = i2c_master_write_read_device(dev->port, dev->addr, (uint8_t[]){DS3231_REG_STATUS}, 1, &status, 1, 1000 / portTICK_PERIOD_MS);
-    if (ret != ESP_OK) return ret;
-
-    if (alarm_num == 1) {
-        status &= ~0x01; // Clear A1F
-    } else if (alarm_num == 2) {
-        status &= ~0x02; // Clear A2F
-    }
-    return i2c_master_write_to_device(dev->port, dev->addr, (uint8_t[]){DS3231_REG_STATUS, status}, 2, 1000 / portTICK_PERIOD_MS);
-}
-
-// Check if alarm has triggered
-esp_err_t ds3231_check_alarm(ds3231_dev_t *dev, uint8_t alarm_num, bool *triggered) {
-    uint8_t status;
-    esp_err_t ret = i2c_master_write_read_device(dev->port, dev->addr, (uint8_t[]){DS3231_REG_STATUS}, 1, &status, 1, 1000 / portTICK_PERIOD_MS);
-    if (ret != ESP_OK) return ret;
-
-    *triggered = (alarm_num == 1) ? (status & 0x01) : (status & 0x02);
-    return ESP_OK;
-}
-
-// Enable/disable SQW output
-esp_err_t ds3231_enable_sqw(ds3231_dev_t *dev, bool enable) {
-    uint8_t control;
-    esp_err_t ret = i2c_master_write_read_device(dev->port, dev->addr, (uint8_t[]){DS3231_REG_CONTROL}, 1, &control, 1, 1000 / portTICK_PERIOD_MS);
-    if (ret != ESP_OK) return ret;
-
-    control = enable ? (control | 0x04) : (control & ~0x04); // INTCN bit
-    return i2c_master_write_to_device(dev->port, dev->addr, (uint8_t[]){DS3231_REG_CONTROL, control}, 2, 1000 / portTICK_PERIOD_MS);
-}
-
-// Initialize ESP32 for deep sleep wake-up via SQW
-esp_err_t ds3231_init_wakeup(ds3231_dev_t *dev, gpio_num_t sqw_pin) {
-    esp_err_t ret = ds3231_enable_sqw(dev, true);
-    if (ret != ESP_OK) return ret;
-
-    // Configure SQW pin as input with pull-up
-    gpio_config_t io_conf = {
-        .pin_bit_mask = (1ULL << sqw_pin),
-        .mode = GPIO_MODE_INPUT,
-        .pull_up_en = GPIO_PULLUP_ENABLE,
-        .pull_down_en = GPIO_PULLDOWN_DISABLE,
-        .intr_type = GPIO_INTR_LOW_LEVEL
+    uint8_t alarm_data[4] = {
+        dec_to_bcd(config->sec) | (a1m1 << 7),
+        dec_to_bcd(config->min) | (a1m2 << 7),
+        dec_to_bcd(config->hour) | (a1m3 << 7),  // 24-hour
+        day_val | (a1m4 << 7) | (dy_dt << 6)
     };
-    ret = gpio_config(&io_conf);
-    if (ret != ESP_OK) return ret;
+    i2c_write(0x07, alarm_data, 4);
 
-    // Enable external wake-up
-    ret = esp_sleep_enable_ext0_wakeup(sqw_pin, 0); // Trigger on LOW
-    return ret;
+    // Set control: A1IE=1, INTCN=1, EOSC=0, A2IE=0
+    uint8_t ctrl;
+    i2c_read(0x0E, &ctrl, 1);
+    ctrl &= ~(1 << 7);  // EOSC=0
+    ctrl |= (1 << 0);   // A1IE=1
+    ctrl |= (1 << 2);   // INTCN=1
+    ctrl &= ~(1 << 1);  // A2IE=0
+    i2c_write(0x0E, &ctrl, 1);
+
+    // Clear flags
+    clear_alarm_flag();
+}
+
+void clear_alarm_flag(void) {
+    uint8_t status;
+    i2c_read(0x0F, &status, 1);
+    status &= ~0x01;  // Clear A1F (bit 0)
+    i2c_write(0x0F, &status, 1);
 }

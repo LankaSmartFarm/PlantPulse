@@ -3,4 +3,4 @@
 factory,app,factory,0x010000,0x180000,,
 ota_0,app,ota_0,0x190000,0x180000,,
 ota_1,app,ota_1,0x310000,0x180000,,
-nvs,data,fat,0x490000,0x300000,,
+storage,data,fat,0x490000,0x300000,,

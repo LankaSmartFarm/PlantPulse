@@ -52,6 +52,9 @@ bool setupGPRS(const char *apn)
     }
 }
 
+
+
+
 void initGPIO(void)
 {
     gpio_config_t io_conf = {
@@ -63,6 +66,7 @@ void initGPIO(void)
 
     gpio_config(&io_conf);
     gpio_set_level(MODEM_RESET_PIN, 1); // Set high (inactive) by default
+
 }
 
 void simHardHeset(uint8_t wait_seconds)
@@ -79,6 +83,9 @@ void simHardHeset(uint8_t wait_seconds)
 
 void initUART(void)
 {
+
+    initGPIO();
+    
     uart_config_t config = {
         .baud_rate = 115200,
         .data_bits = UART_DATA_8_BITS,
@@ -709,7 +716,7 @@ bool mqttCheckSubscription(void (*mqtt_callback)(char *topic, uint8_t *payload, 
     return true;
 }
 
-static void connectionHandleTask(void *pvParameters)
+ void connectionHandleTask(void *pvParameters)
 {
     while (1)
     {
@@ -735,7 +742,7 @@ static void connectionHandleTask(void *pvParameters)
     }
 }
 
-static void publishHandleTask(void *pvParameters)
+ void publishHandleTask(void *pvParameters)
 {
     M_payload_t received_payload;
     uint8_t mqtt_packet[512];
@@ -853,10 +860,3 @@ void receiveHandleTask(void *pvParameters)
     }
 }
 
-void initTask(void)
-{
-    xTaskCreatePinnedToCore(connectionHandleTask, "connectionHandleTask", 1024 * 4, NULL, 2, &connectionHandleTask_handle, 0);
-    xTaskCreatePinnedToCore(receiveHandleTask, "receiveHandleTask", 1024 * 6, NULL, 5, &receiveHandleTask_handle, 1);
-    xTaskCreatePinnedToCore(publishHandleTask, "publishHandleTask", 1024 * 4, NULL, 2, &publishHandleTask_handle, 0);
-    xTaskCreatePinnedToCore(dataLoggingHandleTask, "data_collect_task", 1024 * 4, NULL, 2, &dataLoggingTask_Handle, 0);
-}
