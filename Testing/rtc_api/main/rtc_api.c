@@ -5,78 +5,79 @@
 #include <esp_log.h>
 #include "ds3231.h"
 
-#define WAKE_GPIO GPIO_NUM_10  // DS3231 INT pin
-
 static const char *TAG = "MAIN";
-RTC_DATA_ATTR period_t current_period;
-RTC_DATA_ATTR alarm_config_t current_config;
-RTC_DATA_ATTR bool is_configured = false;
 
+RTC_DATA_ATTR int boot_count = 0; // Persist across deep sleep
 
-void perform_task(void) {
-    ESP_LOGI(TAG, "Performing task!");
+void print_wakeup_reason() {
+    esp_sleep_wakeup_cause_t cause = esp_sleep_get_wakeup_cause();
+    switch (cause) {
+        case ESP_SLEEP_WAKEUP_EXT0: ESP_LOGI(TAG, "Wake-up caused by external signal (RTC alarm)"); break;
+        default: ESP_LOGI(TAG, "Wake-up not caused by deep sleep: %d", cause); break;
+    }
 }
 
-void app_main(void) 
-{
-    esp_sleep_wakeup_cause_t wakeup_cause = esp_sleep_get_wakeup_cause();
-    ds3231_init();
+void app_main(void) {
+    // Increment boot count
+    boot_count++;
+    ESP_LOGI(TAG, "Boot count: %d", boot_count);
 
-    if (wakeup_cause == ESP_SLEEP_WAKEUP_EXT0) {
-        clear_alarm_flag();  // Reset INT pin
+    // Print wake-up reason
+    print_wakeup_reason();
 
-        Time current_time;
-        get_time(&current_time);
+    // Initialize DS3231
+    ds3231_dev_t dev;
+    // ESP_ERROR_CHECK(ds3231_init(&dev, I2C_NUM_0, GPIO_NUM_21, GPIO_NUM_22));
+    ds3231_init(&dev, I2C_NUM_0, GPIO_NUM_21, GPIO_NUM_22);
 
-        bool do_task = true;
-        if (current_period == YEARLY) {
-            if ((current_time.month + 1) != current_config.month) {
-                do_task = false;
-            }
-        }
 
-        if (do_task) {
-            perform_task();    
-        }
+    // Set initial time (e.g., 2025-08-08 01:00:00, adjust as needed)
+    struct tm time = {
+        .tm_year = 125, // 2025 - 1900
+        .tm_mon = 7,    // August (0-based)
+        .tm_mday = 8,
+        .tm_hour = 1,
+        .tm_min = 19,
+        .tm_sec = 0,
+        .tm_wday = 5    // Friday (0-based, set for reference)
+    };
+    // ESP_ERROR_CHECK(ds3231_set_time(&dev, &time));
+    ds3231_set_time(&dev, &time);
 
-    } else if (!is_configured) {
+    // Configure Alarm 1 (every Friday at 01:20:00)
+    ds3231_alarm_t alarm1 = {
+        .time = {
+            .tm_hour = 1,   // 01:20 AM
+            .tm_min = 20,
+            .tm_sec = 0,
+              // Friday (0-based in struct tm, converted to 1-7 in library)
+        },
+        .rate1 = DS3231_ALARM1_MINUTES, // Trigger on specific day of week
+        .enabled = true
+    };
+    // ds3231_alarm_t alarm1 = {
+    // .time = {0}, // Time fields ignored for EVERY_MINUTE
+    // .rate1 = DS3231_ALARM1_MINUTES,
+    // .enabled = true
+    // };
 
-        // Initial setup (first boot or reset)
-        // Example: Set current time to Sep 2, 2025, 12:00:00, Tuesday (wday=2)
-        Time initial_time = {
-            .seconds = 0,
-            .minutes= 0,
-            .hours = 12,
-            .day = 2,
-            .month = 8,  // September (0-11)
-            .year = 125,  // 2025 - 1900
-            .wday = 2  // Tuesday (0-6)
-        };
-        set_time(&initial_time);
 
-        // Example: Set Hourly alarm 
-        alarm_config_t config = {
-            .sec = 0,
-            .min = 1,
-            .hour = 0,
-            .dow = 0,  // Unused
-            .date = 0,
-            .month = 0
-        };
-        current_period = HOURLY;
-        rtc_set_alarm(current_period, &config);
-        current_config = config;
-        is_configured = true;
+    //ESP_ERROR_CHECK(ds3231_set_alarm(&dev, &alarm1, NULL));
+    ds3231_set_alarm(&dev, &alarm1, NULL);
+    // Initialize wake-up on SQW pin (GPIO 33)
+    //ESP_ERROR_CHECK(ds3231_init_wakeup(&dev, GPIO_NUM_33));
+    ds3231_init_wakeup(&dev, GPIO_NUM_33);
+    // Perform task (e.g., log current time)
+   // ESP_ERROR_CHECK(ds3231_get_time(&dev, &time));
+    ds3231_get_time(&dev, &time);
+    ESP_LOGI(TAG, "Current time: %04d-%02d-%02d %02d:%02d:%02d (Day: %d)",
+             time.tm_year + 1900, time.tm_mon + 1, time.tm_mday,
+             time.tm_hour, time.tm_min, time.tm_sec, time.tm_wday + 1);
 
-        ESP_LOGI(TAG, "Initial configuration done.");
-    }
-
-    // Configure wake-up and sleep
-    esp_sleep_enable_ext0_wakeup(WAKE_GPIO, 0);  // Wake on low level
-    // Optional: Enable pull-up on wake GPIO
-    gpio_pullup_en(WAKE_GPIO);
-
-    ESP_LOGI(TAG, "Going to sleep!");
+    // Clear alarm flag
+   // ESP_ERROR_CHECK(ds3231_clear_alarm(&dev, 1));
+        ds3231_clear_alarm(&dev, 1);
+    // Enter deep sleep
+    ESP_LOGI(TAG, "Entering deep sleep until next Friday at 01:20:00...");
     esp_deep_sleep_start();
-    
 }

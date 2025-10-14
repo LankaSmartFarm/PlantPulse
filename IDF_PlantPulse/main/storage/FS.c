@@ -4,23 +4,22 @@ extern QueueHandle_t mqttAckQueue;
 static const char *TAG = "FAT";
 
 // Function to initialize and mount FAT filesystem
-esp_err_t init_fatfs(void) {
+esp_err_t init_fatfs(void)
+{
     esp_err_t ret;
     const esp_vfs_fat_mount_config_t mount_config = {
         .max_files = 10,
         .format_if_mount_failed = true,
-        .allocation_unit_size = CONFIG_WL_SECTOR_SIZE
-    };
+        .allocation_unit_size = CONFIG_WL_SECTOR_SIZE};
 
     // Mount FATFS partition
     ret = esp_vfs_fat_spiflash_mount(MOUNT_POINT, "storage", &mount_config, &s_wl_handle);
-
-    if (ret != ESP_OK) {
-        ESP_LOGE("init_fatfs", "Failed to mount FATFS (%s)", esp_err_to_name(ret));
+    if (ret != ESP_OK)
+    {
+        // ESP_LOGE("init_fatfs", "Failed to mount FATFS (%s)", esp_err_to_name(ret));
         return ret;
     }
-    ESP_LOGI("init_fatfs", "FATFS mounted successfully");
-
+    // ESP_LOGI("init_fatfs", "FATFS mounted successfully");
 
     return ESP_OK;
 }
@@ -54,7 +53,6 @@ static void create_directory(const char *dir_path)
 void setup_directories(void)
 {
     create_directory(LOG_PATH);
-    vTaskDelay(pdMS_TO_TICKS(100)); // Small delay to ensure directory creation
     create_directory(CREDENTIAL_PATH);
 }
 
@@ -109,7 +107,7 @@ static esp_err_t processPendingLogs(void)
 
         char file_path[128];
         strncpy(file_path, LOG_PATH, sizeof(file_path) - 1);
-        file_path[sizeof(file_path) - 1] = '\0';
+        file_path[sizeof(file_path) - 1] = '\0'; 
         strncat(file_path, "/", sizeof(file_path) - strlen(file_path) - 1);
         strncat(file_path, entry->d_name, sizeof(file_path) - strlen(file_path) - 1);
 
@@ -165,8 +163,7 @@ static esp_err_t processPendingLogs(void)
 void checkPendingLogs(void)
 {
     DIR *dir = opendir(LOG_PATH);
-    if (!dir)
-    {
+    if (!dir) {
         ESP_LOGE("FAT", "Failed to open log directory: %s", LOG_PATH);
         return;
     }
@@ -174,29 +171,19 @@ void checkPendingLogs(void)
     struct dirent *entry;
     bool has_logs = false;
 
-    while ((entry = readdir(dir)) != NULL)
-    {
-        if (strstr(entry->d_name, ".bin"))
-        {
+    while ((entry = readdir(dir)) != NULL) {
+        if (strstr(entry->d_name, ".bin")) {
             has_logs = true;
-            break; // Found at least one .bin file
+            break;  // Found at least one .bin file
         }
     }
 
     closedir(dir);
 
-    if (has_logs)
-    {
+    if (has_logs) {
         ESP_LOGI("FAT", "Pending log files found. Processing...");
         processPendingLogs();
-    }
-    else
-    {
+    } else {
         ESP_LOGI("FAT", "No pending log files to process.");
     }
 }
-
-
-
-
-
