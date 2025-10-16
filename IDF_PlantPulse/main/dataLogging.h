@@ -6,6 +6,8 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/queue.h"
 #include "freertos/semphr.h"
+#include "driver/adc.h"
+#include "esp_adc_cal.h"
 #include "RS_485.h"
 #include "mqtt.h"
 
@@ -26,6 +28,16 @@
 #define SOIL_PACKET_TYPE   0x02B4C6D8   // Soil sensor packet (ESP32 → App)
 #define ACK_PACKET_TYPE    0x03D7E9FA   // Acknowledgment / response (App → ESP32)
 #define CMD_PACKET_TYPE    0x04EAFB1C   // Command / control (App → ESP32)
+
+
+
+#define CHARGE_DETECT_GPIO  GPIO_NUM_2
+#define BATTERY_CHARGE_STATE GPIO_NUM_1
+#define BATTERY_ADC_CHANNEL ADC1_CHANNEL_0
+#define DEFAULT_VREF 1100         
+#define NO_OF_SAMPLES 64        
+#define MIN_VOLTAGE 1600
+
 
 
 
@@ -54,7 +66,7 @@ typedef struct __attribute__((packed)) {
 typedef struct __attribute__((packed)) {
     uint32_t packet_type;     // 4 bytes (PING_PACKET_TYPE)
     uint8_t  device_id[6];    // 6 bytes (ESP32 MAC or custom ID)
-    int8_t   ble_rssi;        // 1 byte  (RSSI value)
+    uint32_t   runTime;        // 1 byte  (RSSI value)
     uint16_t battery_level;   // 2 bytes (mV or scaled)
     uint8_t  charge_status;   // 1 byte  (0 = not charging, 1 = charging)
     uint8_t  modbus_slave_id; // 1 byte

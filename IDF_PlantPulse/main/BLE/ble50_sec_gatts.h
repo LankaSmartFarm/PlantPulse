@@ -28,13 +28,17 @@ enum
 
     HRS_IDX_NB,
 };
-extern uint8_t eventCmd;
+
+
+static const char *TAG = "DEVICE_ID";
 
 void BLEStart(void);
 void sendOverBLE_soil_packet(soil_packet_t soil_packet,uint16_t total_len);
 void sendOverBLE_ping_packet(ping_packet_t ping_packet, uint16_t total_len);
+void get_device_id(uint8_t *device_id);
 
 
 extern TaskHandle_t soilBleTaskHandle;
+extern TaskHandle_t pingBleTaskHandle;
 
 #endif

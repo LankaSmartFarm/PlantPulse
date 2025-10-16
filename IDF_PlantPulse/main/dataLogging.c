@@ -1,6 +1,9 @@
 
 #include <string.h>
 #include "dataLogging.h"
+#include "BLE/ble50_sec_gatts.h"
+
+esp_adc_cal_characteristics_t *adc_chars_bat = NULL;
 
 QueueHandle_t modbus_payload_queue;
 TaskHandle_t dataLoggingTask_Handle = NULL;
@@ -213,7 +216,7 @@ void build_soil_packet(soil_packet_t *packet)
     packet->data_type = SOIL_PACKET_TYPE;
 
     // 2️⃣ Device ID (6 bytes)
-    // get_device_id(packet.device_id);
+    get_device_id(packet->device_id);
 
     // 3️⃣ Read 8-in-1 soil sensor via Modbus
     packet->soil8in1 = build_soil8in1_data();
@@ -227,36 +230,83 @@ void build_soil_packet(soil_packet_t *packet)
     ESP_LOGI("SOIL_PACKET", "Soil packet built successfully, CRC=0x%04X", packet->crc);
 }
 
+static void charge_init(void)
+{
+
+    gpio_config_t io_conf = {
+        .pin_bit_mask = (1ULL << CHARGE_DETECT_GPIO),
+        .mode = GPIO_MODE_INPUT,
+        .pull_up_en = GPIO_PULLUP_DISABLE,
+        .pull_down_en = GPIO_PULLDOWN_DISABLE,
+        .intr_type = GPIO_INTR_DISABLE,
+    };
+    gpio_config(&io_conf);
+
+    io_conf.intr_type = GPIO_INTR_DISABLE;
+    io_conf.pin_bit_mask = (1ULL << BATTERY_CHARGE_STATE);
+    io_conf.mode = GPIO_MODE_INPUT;
+    io_conf.pull_up_en = GPIO_PULLUP_DISABLE;
+    io_conf.pull_down_en = GPIO_PULLDOWN_DISABLE;
+    gpio_config(&io_conf);
+
+    // Configure ADC for PIR sensor (ADC1)
+    adc1_config_width(ADC_WIDTH_BIT_12);                             // 12-bit resolution
+    adc1_config_channel_atten(BATTERY_ADC_CHANNEL, ADC_ATTEN_DB_11); // 0-3.6V range
+    adc_chars_bat = (esp_adc_cal_characteristics_t *)calloc(1, sizeof(esp_adc_cal_characteristics_t));
+    esp_adc_cal_characterize(ADC_UNIT_1, ADC_ATTEN_DB_11, ADC_WIDTH_BIT_12, DEFAULT_VREF, adc_chars_bat);
+}
+
+static uint8_t is_device_charging(void)
+{
+    // Assuming LOW = charging
+    return gpio_get_level(CHARGE_DETECT_GPIO);
+}
+static uint16_t get_battery_mv(void)
+{
+
+    if (adc_chars_bat != NULL)
+    {
+
+        uint32_t adc_reading = 0;
+        for (int i = 0; i < NO_OF_SAMPLES; i++)
+        {
+            adc_reading += adc1_get_raw(BATTERY_ADC_CHANNEL);
+        }
+        adc_reading /= NO_OF_SAMPLES;
+
+        uint16_t bat_adc = esp_adc_cal_raw_to_voltage(adc_reading, adc_chars_bat); // Return voltage in mV
+        printf("bat_adc : %d mV\n", bat_adc);
+        return bat_adc; // Example: 3850 mV
+    }
+    return 0xFFFF;
+}
 
 ping_packet_t build_ping_packet(void)
 {
     ping_packet_t pkt;
     memset(&pkt, 0xFF, sizeof(pkt)); // Fill all with 0xFF initially
 
-  //  pkt.packet_type = PING_PACKET_TYPE;
+    pkt.packet_type = PING_PACKET_TYPE;
 
     // 1️⃣ Device ID (replace with your own MAC getter)
-  // get_device_id(pkt.device_id);   // Example: esp_read_mac()
+    get_device_id(pkt.device_id); 
 
-    // 2️⃣ BLE RSSI (you can track last RSSI)
-  // pkt.ble_rssi = get_ble_rssi();  // Or use a stored variable
+    // 2️⃣ device uptime in seconds
+    pkt.runTime = xTaskGetTickCount() / 1000; 
 
     // 3️⃣ Battery level
- //  pkt.battery_level = get_battery_mv();  // e.g., 3850 mV
+    pkt.battery_level = get_battery_mv(); 
 
     // 4️⃣ Charge indicator
- //  pkt.charge_status = is_device_charging() ? 1 : 0;
+    pkt.charge_status = is_device_charging() ? 1 : 0;
 
     // 5️⃣ Modbus slave ID
- //  pkt.modbus_slave_id = get_modbus_slave_id();
+    pkt.modbus_slave_id = 0x01; // get_modbus_slave_id();
 
     // 6️⃣ Compute CRC
-   // pkt.crc = crc16((uint8_t *)&pkt, sizeof(pkt) - 2);
+    pkt.crc = crc16((uint8_t *)&pkt, sizeof(pkt) - 2);
     return pkt;
 }
-
-
-
 
 void soil_ble_task(void *pv)
 {
@@ -282,14 +332,15 @@ void soil_ble_task(void *pv)
 
 void ping_ble_task(void *pv)
 {
+
+    charge_init();
+
     while (1)
     {
+        ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
         // Build ping packet
         ping_packet_t pkt = build_ping_packet();
-
         // Send over BLE
         sendOverBLE_ping_packet(pkt, sizeof(ping_packet_t));
-        // Wait 2 seconds 
-        vTaskDelay(pdMS_TO_TICKS(2000));
     }
 }

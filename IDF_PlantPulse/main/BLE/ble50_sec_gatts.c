@@ -19,6 +19,8 @@
 #include "esp_bt_defs.h"
 #include "esp_bt_main.h"
 #include "ble50_sec_gatts.h"
+#include "esp_mac.h"
+#include "esp_wifi.h"
 
 #define GATTS_TABLE_TAG "SEC_GATTS_DEMO"
 
@@ -40,7 +42,7 @@ static uint8_t ext_adv_raw_data[] = {
     0x02, 0x0a, 0xeb, 0x03, 0x03, 0xab, 0xcd,
     // 0x11, 0X09, 'E', 'S', 'P', '_', 'B', 'L', 'E', '5', '0', '_', 'S', 'E', 'R', 'V', 'E', 'R',
     // len // 0x0A
-    0x0A, 0X09, 'E', 'S', 'P', '_', 'B', 'L', 'E', '5', '0'
+    0x0B, 0X09, 'P', 'l', 'a', 'n', 't', 'P', 'u', 'l', 's', 'e' // PlantPulse
 
 };
 
@@ -397,12 +399,16 @@ static void gatts_profile_event_handler(esp_gatts_cb_event_t event,
             uint32_t received_value = 0;
             memcpy(&received_value, data, 4);
 
-            //printf("BLE Received: 0x%08X\n", received_value);
-
+            printf("BLE Received: 0x%08" PRIX32 "\n", received_value);
             if (received_value == SOIL_PACKET_TYPE)
             {
                 printf("Soil packet request received from app\n");
                 xTaskNotifyGive(soilBleTaskHandle);
+            }
+            else if (received_value == PING_PACKET_TYPE)
+            {
+                printf("Ping packet request received from app\n");
+                xTaskNotifyGive(pingBleTaskHandle);
             }
         }
 
@@ -537,63 +543,16 @@ static void gatts_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_
     } while (0);
 }
 
-// void populate_payload_with_ble_mac(Payload *payload) {
-
-//     esp_bd_addr_t local_used_addr;
-//     uint8_t addr_type;
-
-//     // Get the BLE MAC address
-//     esp_err_t err = esp_ble_gap_get_local_used_addr(local_used_addr, &addr_type);
-//     if (err != ESP_OK) {
-//         printf("Failed to get BLE MAC address\n");
-//         return;
-//     }
-
-//     // memcpy(payload->data.mac, local_used_addr, 6);
-//     // mac in disending order
-//     for (int i = 0; i < 6; i++) {
-//         payload->data.mac[i] = local_used_addr[5 - i];
-//     }
-
-// }
-
-// void sendOverBLE(Payload *dataPac){
-//     // Send the payload over BLE
-//     // Update the characteristic value for IDX_CHAR_VAL_B
-//     esp_err_t set_attr_ret = esp_ble_gatts_set_attr_value(
-//         profile_handle_table[IDX_CHAR_VAL_B], // Use IDX_CHAR_VAL_B
-//         PAYLOAD_LEN,
-//         (uint8_t *)dataPac->payload
-//     );
-
-//     if (set_attr_ret != ESP_OK) {
-//         ESP_LOGE(GATTS_TABLE_TAG, "Failed to set characteristic value, error code: %d", set_attr_ret);
-//     } else {
-//         // Send notification on IDX_CHAR_VAL_B
-//         esp_ble_gatts_send_indicate(
-//             heart_rate_profile_tab[HEART_PROFILE_APP_IDX].gatts_if,
-//             0,                                  // Connection ID
-//             profile_handle_table[IDX_CHAR_VAL_B], // Use IDX_CHAR_VAL_B
-//             PAYLOAD_LEN,
-//             (uint8_t *)dataPac->payload,
-//             false                              // Confirm (false = notification, true = indication)
-//         );
-//         eventCmd=IDLE_CMD;
-//     }
-
-// }
-
-
-void sendOverBLE_soil_packet(soil_packet_t soil_packet,uint16_t total_len)
+void sendOverBLE_soil_packet(soil_packet_t soil_packet, uint16_t total_len)
 {
 
     esp_err_t set_attr_ret = esp_ble_gatts_set_attr_value(
         profile_handle_table[IDX_CHAR_VAL_B],
         total_len,
-        (uint8_t *)&soil_packet
-    );
+        (uint8_t *)&soil_packet);
 
-    if (set_attr_ret != ESP_OK) {
+    if (set_attr_ret != ESP_OK)
+    {
         ESP_LOGE(GATTS_TABLE_TAG, "Failed to set characteristic value, err: %d", set_attr_ret);
         return;
     }
@@ -607,12 +566,14 @@ void sendOverBLE_soil_packet(soil_packet_t soil_packet,uint16_t total_len)
         false // Notification (true for indication)
     );
 
-    if (notify_ret == ESP_OK) {
+    if (notify_ret == ESP_OK)
+    {
         ESP_LOGI(GATTS_TABLE_TAG, "Soil data sent over BLE (%d bytes)", total_len);
-    } else {
+    }
+    else
+    {
         ESP_LOGE(GATTS_TABLE_TAG, "Failed to send BLE notification, err: %d", notify_ret);
     }
-
 }
 void sendOverBLE_ping_packet(ping_packet_t ping_packet, uint16_t total_len)
 {
@@ -620,10 +581,10 @@ void sendOverBLE_ping_packet(ping_packet_t ping_packet, uint16_t total_len)
     esp_err_t set_attr_ret = esp_ble_gatts_set_attr_value(
         profile_handle_table[IDX_CHAR_VAL_B],
         total_len,
-        (uint8_t *)&ping_packet
-    );
+        (uint8_t *)&ping_packet);
 
-    if (set_attr_ret != ESP_OK) {
+    if (set_attr_ret != ESP_OK)
+    {
         ESP_LOGE(GATTS_TABLE_TAG, "Failed to set ping characteristic value, err: %d", set_attr_ret);
         return;
     }
@@ -639,13 +600,15 @@ void sendOverBLE_ping_packet(ping_packet_t ping_packet, uint16_t total_len)
     );
 
     // 3️⃣ Log result
-    if (notify_ret == ESP_OK) {
+    if (notify_ret == ESP_OK)
+    {
         ESP_LOGI(GATTS_TABLE_TAG, "Ping packet sent over BLE (%d bytes)", total_len);
-    } else {
+    }
+    else
+    {
         ESP_LOGE(GATTS_TABLE_TAG, "Failed to send BLE ping notification, err: %d", notify_ret);
     }
 }
-
 
 void BLEStart(void)
 {
@@ -738,4 +701,28 @@ void BLEStart(void)
      * vTaskDelay(30000 / portTICK_PERIOD_MS);
      * remove_all_bonded_devices();
      */
+}
+
+/**
+ * @brief Get 6-byte unique device ID (ESP32 MAC)
+ *
+ * @param device_id Pointer to a 6-byte array where ID will be stored
+ */
+void get_device_id(uint8_t *device_id)
+{
+
+    // Read the base MAC address from EFUSE (factory programmed)
+    esp_err_t ret = esp_read_mac(device_id, ESP_MAC_BT); // For BLE (Bluetooth MAC)
+    // Or use ESP_MAC_WIFI_STA if you prefer WiFi MAC as ID
+
+    if (ret != ESP_OK)
+    {
+        ESP_LOGE(TAG, "Failed to read MAC address: %s", esp_err_to_name(ret));
+        memset(device_id, 0xFF, 6); // fallback
+        return;
+    }
+
+    ESP_LOGI(TAG, "Device ID (MAC): %02X:%02X:%02X:%02X:%02X:%02X",
+             device_id[0], device_id[1], device_id[2],
+             device_id[3], device_id[4], device_id[5]);
 }

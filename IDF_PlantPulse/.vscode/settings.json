@@ -1,11 +1,28 @@
 {
-    "idf.portWin": "COM3",
-    "files.associations": {
-        "userconfig.h": "c",
-        "machinconfig.h": "c",
-        "string.h": "c",
-        "fs.h": "c",
-        "ble50_sec_gatts.h": "c"
-    },
-    "idf.flashType": "UART"
+  "idf.portWin": "COM3",
+  "files.associations": {
+    "userconfig.h": "c",
+    "machinconfig.h": "c",
+    "string.h": "c",
+    "fs.h": "c",
+    "ble50_sec_gatts.h": "c",
+    "stdio.h": "c",
+    "datalogging.h": "c"
+  },
+  "idf.flashType": "UART",
+  "idf.openOcdConfigs": [
+    "interface/ftdi/esp32_devkitj_v1.cfg",
+    "target/esp32s3.cfg"
+  ],
+  "idf.customExtraVars": {
+    "OPENOCD_SCRIPTS": "C:\\Espressif\\tools\\openocd-esp32\\v0.12.0-esp32-20230921/openocd-esp32/share/openocd/scripts",
+    "IDF_CCACHE_ENABLE": "1",
+    "IDF_TARGET": "esp32s3"
+  },
+  "clangd.path": "C:\\Espressif\\tools\\esp-clang\\16.0.1-fe4f10a809\\esp-clang\\bin\\clangd.exe",
+  "clangd.arguments": [
+    "--background-index",
+    "--query-driver=C:\\Espressif\\tools\\xtensa-esp-elf\\esp-13.2.0_20240530\\xtensa-esp-elf\\bin\\xtensa-esp32s3-elf-gcc.exe",
+    "--compile-commands-dir=d:\\project\\PlantPulse\\IDF_PlantPulse\\build"
+  ]
 }
