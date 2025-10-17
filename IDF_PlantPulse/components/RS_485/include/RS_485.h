@@ -38,4 +38,5 @@ uint8_t MB_rtu_receive(uint8_t *response_buffer, uint16_t buffer_size);
 uint16_t crc16(uint8_t *data, uint16_t length);
 
 
+extern uint8_t read_modbus_address();
 

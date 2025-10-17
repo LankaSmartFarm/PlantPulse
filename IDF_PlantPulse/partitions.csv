@@ -1,6 +1,8 @@
 # ESP-IDF Partition Table
 # Name, Type, SubType, Offset, Size, Flags
-factory,app,factory,0x010000,0x180000,,
-ota_0,app,ota_0,0x190000,0x180000,,
-ota_1,app,ota_1,0x310000,0x180000,,
-storage,data,fat,0x490000,0x300000,,
+nvs,      data, nvs,     0x9000, 0x4000, ,      # 16 KB NVS
+phy_init, data, phy,     0xD000, 0x1000,  ,     # 4 KB PHY init
+factory,  app,  factory, 0x10000, 0x180000, ,   # 1.5 MB factory app
+ota_0,    app,  ota_0,   0x190000, 0x180000, ,   # 1.5 MB OTA0
+ota_1,    app,  ota_1,   0x310000, 0x180000, ,   # 1.5 MB OTA1
+storage,  data, fat,     0x490000, 0x370000  ,,   # ~3.7 MB storage

@@ -3,6 +3,8 @@
 
 static const char *TAG = "MB_RTU";
 
+extern uint8_t modbusSlaveAddress; // Default Modbus slave address
+
 // Initialize Modbus RTU UART
 void RS_485_Init(void)
 {
@@ -21,6 +23,10 @@ void RS_485_Init(void)
     // Install UART driver
     ESP_ERROR_CHECK(uart_driver_install(MB_UART_PORT, MB_RX_BUFFER_SIZE, MB_TX_BUFFER_SIZE, 0, NULL, 0));
     ESP_LOGI(TAG, "MB RTU UART initialized");
+
+    uint8_t tempAddr = read_modbus_address();
+    modbusSlaveAddress = tempAddr > 0 ? tempAddr : 0x01; // Load saved address or default to 0x01
+    printf("Modbus Address: %02X\n", modbusSlaveAddress);
 }
 
 // Send Modbus RTU frame

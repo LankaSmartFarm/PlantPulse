@@ -13,6 +13,9 @@
 #include <string.h>
 #include "dataLogging.h"
 /* Attributes State Machine */
+
+
+#define SENT_MAX 512  // Maximum MTU size for BLE 5.0
 enum
 {
     IDX_SVC,
@@ -31,14 +34,15 @@ enum
 
 
 static const char *TAG = "DEVICE_ID";
+extern uint8_t modbusSlaveAddress; // Default Modbus slave address
 
 void BLEStart(void);
 void sendOverBLE_soil_packet(soil_packet_t soil_packet,uint16_t total_len);
 void sendOverBLE_ping_packet(ping_packet_t ping_packet, uint16_t total_len);
 void get_device_id(uint8_t *device_id);
-
-
 extern TaskHandle_t soilBleTaskHandle;
 extern TaskHandle_t pingBleTaskHandle;
+extern esp_err_t save_modbus_address( uint8_t slave_addr);
+
 
 #endif

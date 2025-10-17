@@ -10,6 +10,7 @@
 #include "sys/stat.h"
 #include "wear_levelling.h"
 #include "mqtt.h"
+#include "dataLogging.h"
 
 
 static wl_handle_t s_wl_handle = WL_INVALID_HANDLE;
@@ -25,6 +26,9 @@ void setup_directories(void);
 void checkPendingLogs(void);
 
 extern esp_err_t savePayload(const M_payload_t *payload);
+esp_err_t save_modbus_address( uint8_t slave_addr);
+uint8_t read_modbus_address();
+
 
 
 

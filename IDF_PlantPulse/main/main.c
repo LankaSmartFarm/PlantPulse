@@ -35,7 +35,9 @@ void HALT()
 
 void app_main(void)
 {
-    configure_dynamic_frequency();
+    // configure_dynamic_frequency();
+    #if defined(GSM_DEVICE)
+
     modbus_payload_queue = xQueueCreate(5, sizeof(M_payload_t));
     mqttAckQueue = xQueueCreate(5, sizeof(char[128])); // Store file paths only
 
@@ -45,6 +47,7 @@ void app_main(void)
         ESP_LOGE("mqttAckQueue", "Failed to create");
         esp_restart();
     }
+    #endif
     if (init_fatfs() == ESP_OK)
     {
         setup_directories();

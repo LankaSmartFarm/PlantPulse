@@ -20,7 +20,7 @@
 
 
 // Define your Modbus constants
-#define SOIL8IN1_SLAVE_ID      0x01
+#define SLAVE_ADDR_FILE "modbus_slave_addr.bin"
 #define SOIL_PACKET_SIZE  64
 
 // Unique 32-bit packet identifiers (undisplayable / non-ASCII sequences)
@@ -28,6 +28,7 @@
 #define SOIL_PACKET_TYPE   0x02B4C6D8   // Soil sensor packet (ESP32 → App)
 #define ACK_PACKET_TYPE    0x03D7E9FA   // Acknowledgment / response (App → ESP32)
 #define CMD_PACKET_TYPE    0x04EAFB1C   // Command / control (App → ESP32)
+#define SLAVE_ADDR_PACKET_TYPE 0x05ACBDDE // Set Modbus slave address (App → ESP32)
 
 
 

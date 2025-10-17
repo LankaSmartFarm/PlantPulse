@@ -3,6 +3,7 @@
 #include "dataLogging.h"
 #include "BLE/ble50_sec_gatts.h"
 
+uint8_t modbusSlaveAddress=0x01; // Default Modbus slave address
 esp_adc_cal_characteristics_t *adc_chars_bat = NULL;
 
 QueueHandle_t modbus_payload_queue;
@@ -156,7 +157,7 @@ soil8in1_data_t build_soil8in1_data(void)
     for (int attempt = 0; attempt < 5; attempt++)
     {
         // Send Modbus request
-        MB_rtu_send(SOIL8IN1_SLAVE_ID, SOIL8IN1_FUNC_CODE, SOIL8IN1_REG_ADDR, SOIL8IN1_REG_COUNT, tx_buf, 0);
+        MB_rtu_send(modbusSlaveAddress, SOIL8IN1_FUNC_CODE, SOIL8IN1_REG_ADDR, SOIL8IN1_REG_COUNT, tx_buf, 0);
 
         // Receive Modbus response
         int recv_len = MB_rtu_receive(rx_buf, sizeof(rx_buf));
@@ -208,27 +209,99 @@ soil8in1_data_t build_soil8in1_data(void)
  * @brief Builds a complete soil BLE data packet (64 bytes)
  * @return soil_packet_t - fully ready packet with CRC
  */
+// void build_soil_packet(soil_packet_t *packet)
+// {
+//     // 1️⃣ Fill entire struct with 0xFF initially
+//     memset(packet, 0xFF, sizeof(*packet));
+
+//     // 2️⃣ Data type for identification
+//     packet->data_type = SOIL_PACKET_TYPE;
+
+//     // 3️⃣ Device ID (6 bytes)
+//     get_device_id(packet->device_id);
+
+//     // 4️⃣ Read soil sensor data
+//     packet->soil8in1 = build_soil8in1_data();
+
+//     // 5️⃣ Compute CRC (excluding last 2 bytes)
+//     packet->crc = crc16((uint8_t *)packet, sizeof(*packet) - sizeof(packet->crc));
+
+//     // 6️⃣ Print formatted packet fields
+//     printf("\n================ SOIL PACKET =================\n");
+//     printf("Data Type        : 0x%08lX\n", packet->data_type);
+//     printf("Device ID        : ");
+//     for (int i = 0; i < 6; i++) printf("%02X ", packet->device_id[i]);
+//     printf("\n");
+
+//     printf("Temperature      : %u (%.2f°C)\n", packet->soil8in1.temperature, packet->soil8in1.temperature / 100.0);
+//     printf("Humidity         : %u (%.2f%%)\n", packet->soil8in1.humidity, packet->soil8in1.humidity / 100.0);
+//     printf("EC               : %u µS/cm\n", packet->soil8in1.ec);
+//     printf("pH               : %u (%.2f)\n", packet->soil8in1.ph, packet->soil8in1.ph / 100.0);
+//     printf("Nitrogen         : %u mg/kg\n", packet->soil8in1.nitrogen);
+//     printf("Phosphorus       : %u mg/kg\n", packet->soil8in1.phosphorus);
+//     printf("Potassium        : %u mg/kg\n", packet->soil8in1.potassium);
+//     printf("Soil Moisture    : %u (%.2f%%)\n", packet->soil8in1.soil_moisture, packet->soil8in1.soil_moisture / 100.0);
+
+//     printf("CRC              : 0x%04X\n", packet->crc);
+//     printf("================================================\n\n");
+
+//     // 7️⃣ Hex dump for full packet
+//     ESP_LOG_BUFFER_HEX("SOIL_PACKET", packet, sizeof(*packet));
+// }
 void build_soil_packet(soil_packet_t *packet)
 {
-    memset(&packet, 0, sizeof(packet));
+    // 1️⃣ Fill entire struct with 0xFF initially
+    memset(packet, 0xFF, sizeof(*packet));
 
-    // 1️⃣ Data type for identification
-    packet->data_type = SOIL_PACKET_TYPE;
+    // 2️⃣ Data type (4 bytes) → big-endian
+    packet->data_type = __builtin_bswap32(SOIL_PACKET_TYPE);
 
-    // 2️⃣ Device ID (6 bytes)
+    // 3️⃣ Device ID (6 bytes)
     get_device_id(packet->device_id);
 
-    // 3️⃣ Read 8-in-1 soil sensor via Modbus
-    packet->soil8in1 = build_soil8in1_data();
+    // 4️⃣ Read soil sensor data
+    soil8in1_data_t soil = build_soil8in1_data();
 
-    // 4️⃣ Reserved bytes (filled with 0xFF)
-    memset(packet->reserved, 0xFF, sizeof(packet->reserved));
+    // 5️⃣ Assign sensor values in big-endian
+    packet->soil8in1.temperature   = __builtin_bswap16(soil.temperature);
+    packet->soil8in1.humidity      = __builtin_bswap16(soil.humidity);
+    packet->soil8in1.ec            = __builtin_bswap16(soil.ec);
+    packet->soil8in1.ph            = __builtin_bswap16(soil.ph);
+    packet->soil8in1.nitrogen      = __builtin_bswap16(soil.nitrogen);
+    packet->soil8in1.phosphorus    = __builtin_bswap16(soil.phosphorus);
+    packet->soil8in1.potassium     = __builtin_bswap16(soil.potassium);
+    packet->soil8in1.soil_moisture = __builtin_bswap16(soil.soil_moisture);
 
-    // 5️⃣ CRC (excluding the CRC field itself)
-    packet->crc = crc16((uint8_t *)&packet, sizeof(packet) - sizeof(packet->crc));
+    // 6️⃣ Compute CRC (excluding last 2 bytes) → then convert to big-endian
+    uint16_t crc = crc16((uint8_t *)packet, sizeof(*packet) - sizeof(packet->crc));
+    packet->crc = __builtin_bswap16(crc);
 
-    ESP_LOGI("SOIL_PACKET", "Soil packet built successfully, CRC=0x%04X", packet->crc);
+    // 7️⃣ Full hex dump
+   // ESP_LOG_BUFFER_HEX("SOIL_PACKET", packet, sizeof(*packet));
+
+    // 8️⃣ Print all fields
+    printf("\n================ SOIL PACKET =================\n");
+    printf("Data Type        : 0x%08X\n", SOIL_PACKET_TYPE);
+    
+    printf("Device ID        : ");
+    for (int i = 0; i < 6; i++) printf("%02X ", packet->device_id[i]);
+    printf("\n");
+
+    // Sensor fields (show hex + decimal/converted)
+    printf("Temperature      : 0x%04X / %.2f °C\n", soil.temperature, soil.temperature / 100.0);
+    printf("Humidity         : 0x%04X / %.2f %%\n", soil.humidity, soil.humidity / 100.0);
+    printf("EC               : 0x%04X / %u µS/cm\n", soil.ec, soil.ec);
+    printf("pH               : 0x%04X / %.2f\n", soil.ph, soil.ph / 100.0);
+    printf("Nitrogen         : 0x%04X / %u mg/kg\n", soil.nitrogen, soil.nitrogen);
+    printf("Phosphorus       : 0x%04X / %u mg/kg\n", soil.phosphorus, soil.phosphorus);
+    printf("Potassium        : 0x%04X / %u mg/kg\n", soil.potassium, soil.potassium);
+    printf("Soil Moisture    : 0x%04X / %.2f %%\n", soil.soil_moisture, soil.soil_moisture / 100.0);
+
+    printf("CRC              : 0x%04X\n", crc);
+    printf("================================================\n\n");
 }
+
+
 
 static void charge_init(void)
 {
@@ -276,7 +349,7 @@ static uint16_t get_battery_mv(void)
 
         uint16_t bat_adc = esp_adc_cal_raw_to_voltage(adc_reading, adc_chars_bat); // Return voltage in mV
         printf("bat_adc : %d mV\n", bat_adc);
-        return bat_adc; // Example: 3850 mV
+        return bat_adc; 
     }
     return 0xFFFF;
 }
@@ -286,27 +359,62 @@ ping_packet_t build_ping_packet(void)
     ping_packet_t pkt;
     memset(&pkt, 0xFF, sizeof(pkt)); // Fill all with 0xFF initially
 
-    pkt.packet_type = PING_PACKET_TYPE;
+    // 1️⃣ Packet type (Big Endian)
+    pkt.packet_type = __builtin_bswap32(PING_PACKET_TYPE);
 
-    // 1️⃣ Device ID (replace with your own MAC getter)
-    get_device_id(pkt.device_id); 
+    // 2️⃣ Device ID (6 bytes)
+    get_device_id(pkt.device_id);
 
-    // 2️⃣ device uptime in seconds
-    pkt.runTime = xTaskGetTickCount() / 1000; 
+    // 3️⃣ Runtime (seconds)
+    uint32_t runtime = xTaskGetTickCount() / 1000;
+    pkt.runTime = __builtin_bswap32(runtime);
 
-    // 3️⃣ Battery level
-    pkt.battery_level = get_battery_mv(); 
+    // 4️⃣ Battery level (millivolts)
+    uint16_t batt_mv = get_battery_mv();
+    pkt.battery_level = __builtin_bswap16(batt_mv);
 
-    // 4️⃣ Charge indicator
-    pkt.charge_status = is_device_charging() ? 1 : 0;
+    // 5️⃣ Charge indicator
+    pkt.charge_status = is_device_charging() ? 0 : 1;
 
-    // 5️⃣ Modbus slave ID
-    pkt.modbus_slave_id = 0x01; // get_modbus_slave_id();
+    // 6️⃣ Modbus slave ID
+    pkt.modbus_slave_id = modbusSlaveAddress;
 
-    // 6️⃣ Compute CRC
-    pkt.crc = crc16((uint8_t *)&pkt, sizeof(pkt) - 2);
+    // 7️⃣ Compute CRC (calculated on big-endian formatted data)
+    uint16_t crc = crc16((uint8_t *)&pkt, sizeof(pkt) - 2);
+    pkt.crc = __builtin_bswap16(crc);
+
+
+
+
+    // 🧾 Debug Print Section
+    printf("\n==== PING PACKET DEBUG ====\n");
+    printf("Packet Type       : 0x%08X\n", PING_PACKET_TYPE);
+    printf("Device ID         : ");
+    for (int i = 0; i < 6; i++) printf("%02X", pkt.device_id[i]);
+    printf("\n");
+    printf("Runtime (dec)     : %ld sec\n", runtime);
+    printf("Runtime (hex)     : 0x%08lX\n", runtime);
+    printf("Battery (dec)     : %d mV\n", batt_mv);
+    printf("Battery (hex)     : 0x%04X\n", batt_mv);
+    printf("Charge Status     : %s\n", pkt.charge_status ? "Charging" : "Not Charging");
+    printf("Modbus Slave ID   : %u\n", pkt.modbus_slave_id);
+    printf("CRC (hex)         : 0x%04X\n", crc);
+    printf("----------------------------\n");
+
+
+    printf("Full Packet (HEX):\n");
+    uint8_t *raw = (uint8_t *)&pkt;
+    for (int i = 0; i < sizeof(pkt); i++) {
+        printf("%02X ", raw[i]);
+        if ((i + 1) % 16 == 0) printf("\n");
+    }
+    printf("\n============================\n");
+
     return pkt;
 }
+
+
+
 
 void soil_ble_task(void *pv)
 {

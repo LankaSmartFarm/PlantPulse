@@ -4,23 +4,23 @@ extern QueueHandle_t mqttAckQueue;
 static const char *TAG = "FAT";
 
 // Function to initialize and mount FAT filesystem
-esp_err_t init_fatfs(void) {
+esp_err_t init_fatfs(void)
+{
     esp_err_t ret;
     const esp_vfs_fat_mount_config_t mount_config = {
         .max_files = 10,
         .format_if_mount_failed = true,
-        .allocation_unit_size = CONFIG_WL_SECTOR_SIZE
-    };
+        .allocation_unit_size = CONFIG_WL_SECTOR_SIZE};
 
     // Mount FATFS partition
     ret = esp_vfs_fat_spiflash_mount(MOUNT_POINT, "storage", &mount_config, &s_wl_handle);
 
-    if (ret != ESP_OK) {
+    if (ret != ESP_OK)
+    {
         ESP_LOGE("init_fatfs", "Failed to mount FATFS (%s)", esp_err_to_name(ret));
         return ret;
     }
     ESP_LOGI("init_fatfs", "FATFS mounted successfully");
-
 
     return ESP_OK;
 }
@@ -53,8 +53,11 @@ static void create_directory(const char *dir_path)
 }
 void setup_directories(void)
 {
+
+#if defined(GSM_DEVICE)
     create_directory(LOG_PATH);
     vTaskDelay(pdMS_TO_TICKS(100)); // Small delay to ensure directory creation
+#endif
     create_directory(CREDENTIAL_PATH);
 }
 
@@ -195,8 +198,62 @@ void checkPendingLogs(void)
         ESP_LOGI("FAT", "No pending log files to process.");
     }
 }
+//----------------------------------------------------
+// Save 1-byte Modbus slave address (binary)
+//----------------------------------------------------
+esp_err_t save_modbus_address(uint8_t slave_addr)
+{
 
+    char filepath[128];
+    snprintf(filepath, sizeof(filepath), "%s/%s", CREDENTIAL_PATH, SLAVE_ADDR_FILE);
 
+    ESP_LOGI(TAG, "Writing Modbus address to: %s", filepath);
 
+    FILE *f = fopen(filepath, "wb"); // use "wb" for binary
+    if (f == NULL)
+    {
+        ESP_LOGE(TAG, "Failed to open file for writing: %s", filepath);
+        return ESP_FAIL;
+    }
 
+    size_t written = fwrite(&slave_addr, 1, 1, f);
+    fclose(f);
 
+    if (written != 1)
+    {
+        ESP_LOGE(TAG, "Failed to write Modbus address");
+        return ESP_FAIL;
+    }
+
+    ESP_LOGI(TAG, "Modbus address %u (0x%02X) saved", slave_addr, slave_addr);
+    return ESP_OK;
+}
+
+//----------------------------------------------------
+// Read 1-byte Modbus slave address (return directly)
+//----------------------------------------------------
+uint8_t read_modbus_address()
+{
+    char filepath[128];
+    snprintf(filepath, sizeof(filepath), "%s/%s", CREDENTIAL_PATH, SLAVE_ADDR_FILE);
+
+    FILE *f = fopen(filepath, "rb");
+    if (f == NULL)
+    {
+        ESP_LOGW(TAG, "File not found: %s, returning default 0", filepath);
+        return 0;
+    }
+
+    uint8_t addr = 0;
+    size_t read_len = fread(&addr, 1, 1, f);
+    fclose(f);
+
+    if (read_len != 1)
+    {
+        ESP_LOGW(TAG, "File read failed or empty: %s, returning 0", filepath);
+        return 0;
+    }
+
+    ESP_LOGI(TAG, "Read Modbus Addr: %u (0x%02X)", addr, addr);
+    return addr;
+}
